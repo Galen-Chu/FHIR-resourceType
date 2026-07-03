@@ -130,6 +130,7 @@ npm run dev
 | POST | `/api/conditions` | `POST /Condition` |
 | POST | `/api/observations` | `POST /Observation` |
 | POST | `/api/medication-requests` | `POST /MedicationRequest` |
+| POST | `/api/{resource}/preview` | —（僅組裝 JSON，不呼叫 FHIR Server） |
 | GET | `/api/organizations/:id/patients` | `GET /Patient?organization={id}` |
 | GET | `/api/patients/:id` | `GET /Patient/{id}` |
 
@@ -140,6 +141,17 @@ npm run dev
 ```
 
 失敗（4xx/5xx）時附上 FHIR 的 `OperationOutcome`，前端以紅色卡片顯示錯誤訊息。
+
+### JSON 規格預覽（Validator 手動驗證）
+
+每個建立頁面都提供「**產生 JSON**」按鈕：以與「送出建立」完全相同的表單資料呼叫
+`POST /api/{resource}/preview`，回傳後端 builder 組裝後的 TW Core JSON（含
+`meta.profile`），**不會寫入 FHIR Server**。畫面上可直接**複製**或**下載 .json**，
+貼到 [validator.fhir.org](https://validator.fhir.org/) 或以 HAPI `$validate`
+操作手動驗證資料格式是否符合 TW Core IG。
+
+> 注意：identifier.value 由後端隨機亂數產生，因此每次預覽產生的 identifier
+> 會與實際送出建立時不同（結構相同）。
 
 ## 七大 TW Core 資源
 

@@ -45,6 +45,13 @@
     </button>
   </div>
 
+  <JsonPreviewPanel
+    endpoint="/medication-requests"
+    :payload="form"
+    :disabled="!canSubmit"
+    filename="medication-request"
+  />
+
   <ResourceResultCard :result="result" />
 </template>
 
@@ -53,6 +60,7 @@ import { ref, reactive, computed } from 'vue';
 import api from '../api';
 import { createdResources, registerResource } from '../store';
 import ResourceResultCard from '../components/ResourceResultCard.vue';
+import JsonPreviewPanel from '../components/JsonPreviewPanel.vue';
 
 const form = reactive({
   patientId: '',

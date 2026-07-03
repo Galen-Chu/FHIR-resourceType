@@ -43,6 +43,8 @@
     </button>
   </div>
 
+  <JsonPreviewPanel endpoint="/conditions" :payload="buildBody" :disabled="!canSubmit" filename="condition" />
+
   <ResourceResultCard :result="result" />
 </template>
 
@@ -51,6 +53,7 @@ import { ref, reactive, computed } from 'vue';
 import api from '../api';
 import { createdResources, registerResource } from '../store';
 import ResourceResultCard from '../components/ResourceResultCard.vue';
+import JsonPreviewPanel from '../components/JsonPreviewPanel.vue';
 
 const form = reactive({
   patientId: '',
@@ -64,14 +67,19 @@ const result = ref(null);
 const loading = ref(false);
 const canSubmit = computed(() => form.patientId && form.encounterId);
 
+// 「產生 JSON」與「送出建立」使用同一份 request body
+function buildBody() {
+  const body = { ...form };
+  if (body.onsetDateTime) body.onsetDateTime = new Date(body.onsetDateTime).toISOString();
+  else delete body.onsetDateTime;
+  return body;
+}
+
 async function submit() {
   loading.value = true;
   result.value = null;
   try {
-    const body = { ...form };
-    if (body.onsetDateTime) body.onsetDateTime = new Date(body.onsetDateTime).toISOString();
-    else delete body.onsetDateTime;
-    const r = await api.post('/conditions', body);
+    const r = await api.post('/conditions', buildBody());
     result.value = r.data;
     if (r.data.id) registerResource('Condition', r.data.id, `${form.icd10Display}（Condition/${r.data.id}）`);
   } catch (err) {

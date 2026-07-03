@@ -180,6 +180,44 @@ button.primary:disabled {
   word-break: break-all;
 }
 
+/* ---- JSON 規格預覽 ---- */
+.json-preview .preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.json-preview .preview-header button {
+  flex-shrink: 0;
+}
+
+.json-preview .preview-actions {
+  display: flex;
+  gap: 10px;
+  margin: 14px 0 10px;
+}
+
+button.ghost {
+  background: #fff;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button.ghost:hover {
+  background: rgba(20, 132, 125, 0.08);
+}
+
+.json-preview .json-view {
+  max-height: 420px;
+  overflow: auto;
+  margin: 0;
+}
+
 /* ---- 查詢結果表格 ---- */
 table.result-table {
   width: 100%;

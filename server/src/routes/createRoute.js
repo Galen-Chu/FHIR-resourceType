@@ -8,6 +8,18 @@ const logger = require('../logger');
 function createRoute(resourceType, builder) {
   const router = express.Router();
 
+  // 產生組裝後的 TW Core JSON（不呼叫 FHIR Server）
+  // 供前端顯示、複製到 FHIR Validator 手動驗證資料格式
+  router.post('/preview', (req, res) => {
+    try {
+      const resource = builder(req.body || {});
+      logger.info(`⊙ Preview ${resourceType} JSON（未送出）`);
+      res.json(resource);
+    } catch (err) {
+      res.status(400).json({ status: 400, error: `JSON 組裝失敗：${err.message}` });
+    }
+  });
+
   router.post('/', async (req, res) => {
     try {
       const resource = builder(req.body || {});

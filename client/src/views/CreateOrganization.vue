@@ -20,6 +20,8 @@
     </button>
   </div>
 
+  <JsonPreviewPanel endpoint="/organizations" :payload="form" filename="organization" />
+
   <ResourceResultCard :result="result" />
 </template>
 
@@ -28,6 +30,7 @@ import { ref, reactive } from 'vue';
 import api from '../api';
 import { registerResource } from '../store';
 import ResourceResultCard from '../components/ResourceResultCard.vue';
+import JsonPreviewPanel from '../components/JsonPreviewPanel.vue';
 
 const form = reactive({ name: '', active: true });
 const result = ref(null);

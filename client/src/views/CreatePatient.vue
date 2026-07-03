@@ -49,6 +49,8 @@
     </button>
   </div>
 
+  <JsonPreviewPanel endpoint="/patients" :payload="form" filename="patient" />
+
   <ResourceResultCard :result="result" />
 </template>
 
@@ -57,6 +59,7 @@ import { ref, reactive } from 'vue';
 import api from '../api';
 import { createdResources, registerResource } from '../store';
 import ResourceResultCard from '../components/ResourceResultCard.vue';
+import JsonPreviewPanel from '../components/JsonPreviewPanel.vue';
 
 const form = reactive({
   family: '',

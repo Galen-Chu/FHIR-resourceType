@@ -40,6 +40,8 @@
     </button>
   </div>
 
+  <JsonPreviewPanel endpoint="/observations" :payload="buildBody" :disabled="!canSubmit" filename="observation" />
+
   <ResourceResultCard :result="result" />
 </template>
 
@@ -48,6 +50,7 @@ import { ref, reactive, computed } from 'vue';
 import api from '../api';
 import { createdResources, registerResource } from '../store';
 import ResourceResultCard from '../components/ResourceResultCard.vue';
+import JsonPreviewPanel from '../components/JsonPreviewPanel.vue';
 
 const VITALS = [
   { code: '8867-4', display: 'Heart rate', text: '心率', unit: 'beats/minute', unitCode: '/min' },
@@ -63,19 +66,25 @@ const result = ref(null);
 const loading = ref(false);
 const canSubmit = computed(() => form.patientId && form.encounterId && form.value !== '');
 
+// 「產生 JSON」與「送出建立」使用同一份 request body
+function buildBody() {
+  const v = VITALS[selectedVital.value];
+  return {
+    ...form,
+    loincCode: v.code,
+    loincDisplay: v.display,
+    codeText: v.text,
+    unit: v.unit,
+    unitCode: v.unitCode
+  };
+}
+
 async function submit() {
   loading.value = true;
   result.value = null;
   const v = VITALS[selectedVital.value];
   try {
-    const r = await api.post('/observations', {
-      ...form,
-      loincCode: v.code,
-      loincDisplay: v.display,
-      codeText: v.text,
-      unit: v.unit,
-      unitCode: v.unitCode
-    });
+    const r = await api.post('/observations', buildBody());
     result.value = r.data;
     if (r.data.id) registerResource('Observation', r.data.id, `${v.text}（Observation/${r.data.id}）`);
   } catch (err) {
