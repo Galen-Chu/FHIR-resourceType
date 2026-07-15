@@ -43,5 +43,8 @@ app.use((req, res) => {
 
 app.listen(config.PORT, () => {
   logger.info(`FHIR Exchange Test Server 啟動於 http://localhost:${config.PORT}`);
-  logger.info(`FHIR Base URL: ${config.FHIR_BASE_URL}`);
+  for (const [key, s] of Object.entries(config.FHIR_SERVERS)) {
+    const isDefault = key === config.DEFAULT_FHIR_ENV ? '（預設）' : '';
+    logger.info(`FHIR 環境 [${key}]${isDefault}: ${s.url}`);
+  }
 });
