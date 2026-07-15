@@ -194,6 +194,31 @@ npm run dev
 - 交換 Log 每行標記目標環境（`[twcore]` / `[hapi-org]`）
 - 環境清單與 URL 可用環境變數覆蓋（`FHIR_URL_TWCORE`、`FHIR_URL_HAPI_ORG`、`FHIR_ENV`）
 
+## CDS Hooks
+
+在既有讀取路徑上提供 [CDS Hooks](https://cds-hooks.hl7.org/) 臨床決策支援端點
+（掛在伺服器根路徑，非 `/api` 之下）：
+
+| 端點 | Hook | 說明 |
+| --- | --- | --- |
+| `GET /cds-services` | — | Discovery：列出可用服務 |
+| `POST /cds-services/patient-summary` | `patient-view` | 彙整病患的 Condition / Observation / MedicationRequest；生命徵象超出正常範圍（心率 60–100、收縮壓 90–140、舒張壓 60–90、體溫 36–38、呼吸 12–20）時回傳 warning 卡片 |
+| `POST /cds-services/medication-duplicate-check` | `order-select` | 比對草稿藥囑與病患現有 active MedicationRequest，重複時回傳 warning 卡片 |
+
+呼叫範例：
+
+```bash
+curl -X POST http://localhost:3000/cds-services/patient-summary \
+  -H 'Content-Type: application/json' \
+  -H 'X-FHIR-Env: twcore' \
+  -d '{ "hook": "patient-view", "hookInstance": "demo-1",
+        "context": { "patientId": "<Patient id>" } }'
+```
+
+回應為標準 CDS Hooks `{ cards: [...] }` 格式（`summary` / `indicator` / `detail` /
+`source`）。前端「CDS Hooks 卡片」頁面可直接選擇病患呼叫兩個服務並渲染卡片。
+環境依 `X-FHIR-Env` header 決定（亦支援 request body 的 `fhirServer` 欄位比對）。
+
 ## 驗證證據（docs/validation/）
 
 `server` 內建驗證證據產出工具：

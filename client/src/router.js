@@ -9,6 +9,7 @@ import CreateObservation from './views/CreateObservation.vue';
 import CreateMedicationRequest from './views/CreateMedicationRequest.vue';
 import QueryByOrganization from './views/QueryByOrganization.vue';
 import QueryByPatientId from './views/QueryByPatientId.vue';
+import CdsHooks from './views/CdsHooks.vue';
 
 export default createRouter({
   history: createWebHistory(),
@@ -22,6 +23,7 @@ export default createRouter({
     { path: '/observations/create', component: CreateObservation },
     { path: '/medication-requests/create', component: CreateMedicationRequest },
     { path: '/query/by-organization', component: QueryByOrganization },
-    { path: '/query/by-patient-id', component: QueryByPatientId }
+    { path: '/query/by-patient-id', component: QueryByPatientId },
+    { path: '/cds-hooks', component: CdsHooks }
   ]
 });

@@ -29,6 +29,9 @@ app.get('/api/config/fhir-servers', (req, res) => {
   });
 });
 
+// CDS Hooks 依規格掛在根路徑（discovery: GET /cds-services）
+app.use('/cds-services', require('./cds'));
+
 app.use('/api/organizations', require('./routes/organizations'));
 app.use('/api/practitioners', require('./routes/practitioners'));
 app.use('/api/patients', require('./routes/patients'));

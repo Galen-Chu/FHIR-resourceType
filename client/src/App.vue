@@ -22,6 +22,9 @@
     <div class="group-title">查詢</div>
     <router-link to="/query/by-organization">依機構查病患</router-link>
     <router-link to="/query/by-patient-id">依 ID 查病患</router-link>
+
+    <div class="group-title">臨床決策支援</div>
+    <router-link to="/cds-hooks">CDS Hooks 卡片</router-link>
   </nav>
 
   <main class="main">
