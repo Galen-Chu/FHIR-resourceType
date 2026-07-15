@@ -5,8 +5,8 @@
   <div class="form-card">
     <div class="form-row">
       <label>機構名稱</label>
-      <input v-model="form.name" placeholder="例如：仁愛醫院" />
-      <div class="hint">identifier 由後端以測試命名空間 + 隨機亂數自動產生</div>
+      <input v-model="form.name" placeholder="例如：仁愛醫院" required />
+      <div class="hint">必填；identifier 由後端以測試命名空間 + 隨機亂數自動產生</div>
     </div>
     <div class="form-row">
       <label>啟用狀態</label>
@@ -15,12 +15,12 @@
         <option :value="false">active = false</option>
       </select>
     </div>
-    <button class="primary" :disabled="loading" @click="submit">
+    <button class="primary" :disabled="loading || !form.name" @click="submit">
       {{ loading ? '建立中…' : '送出建立' }}
     </button>
   </div>
 
-  <JsonPreviewPanel endpoint="/organizations" :payload="form" filename="organization" />
+  <JsonPreviewPanel endpoint="/organizations" :payload="form" :disabled="!form.name" filename="organization" />
 
   <ResourceResultCard :result="result" />
 </template>

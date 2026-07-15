@@ -1,9 +1,10 @@
 // Observation（Observation-twcore）— 生命徵象
 // 核心欄位：code（LOINC）、status（final）、valueQuantity
 // 關鍵 reference：subject → Patient、encounter → Encounter
-const { makeIdentifier, meta, reference } = require('./common');
+const { makeIdentifier, meta, reference, requireFields } = require('./common');
 
 function buildObservation(input = {}) {
+  requireFields(input, ['patientId', 'encounterId', 'loincCode', 'value']);
   return {
     resourceType: 'Observation',
     meta: meta('Observation'),
@@ -24,20 +25,20 @@ function buildObservation(input = {}) {
       coding: [
         {
           system: 'http://loinc.org',
-          code: input.loincCode || '8867-4',
-          display: input.loincDisplay || 'Heart rate'
+          code: input.loincCode,
+          ...(input.loincDisplay ? { display: input.loincDisplay } : {})
         }
       ],
-      text: input.codeText || input.loincDisplay || '心率'
+      text: input.codeText || input.loincDisplay || input.loincCode
     },
     subject: reference('Patient', input.patientId),
     encounter: reference('Encounter', input.encounterId),
     effectiveDateTime: input.effectiveDateTime || new Date().toISOString(),
     valueQuantity: {
-      value: input.value !== undefined ? Number(input.value) : 72,
-      unit: input.unit || 'beats/minute',
+      value: Number(input.value),
+      unit: input.unit || '',
       system: 'http://unitsofmeasure.org',
-      code: input.unitCode || input.unit || '/min'
+      code: input.unitCode || input.unit || ''
     }
   };
 }

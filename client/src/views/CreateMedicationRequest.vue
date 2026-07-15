@@ -72,7 +72,9 @@ const form = reactive({
 });
 const result = ref(null);
 const loading = ref(false);
-const canSubmit = computed(() => form.patientId && form.encounterId && form.practitionerId);
+const canSubmit = computed(
+  () => form.patientId && form.encounterId && form.practitionerId && form.medicationText
+);
 
 async function submit() {
   loading.value = true;

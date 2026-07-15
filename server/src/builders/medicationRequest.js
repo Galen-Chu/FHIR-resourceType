@@ -1,9 +1,10 @@
 // MedicationRequest（MedicationRequest-twcore）— 用藥醫囑
 // 核心欄位：status（active）、medicationCodeableConcept、dosageInstruction
 // 關鍵 reference：subject → Patient、encounter → Encounter、requester → Practitioner
-const { makeIdentifier, meta, reference } = require('./common');
+const { makeIdentifier, meta, reference, requireFields } = require('./common');
 
 function buildMedicationRequest(input = {}) {
+  requireFields(input, ['patientId', 'encounterId', 'practitionerId', 'medicationText']);
   return {
     resourceType: 'MedicationRequest',
     meta: meta('MedicationRequest'),
@@ -11,14 +12,18 @@ function buildMedicationRequest(input = {}) {
     status: input.status || 'active',
     intent: 'order',
     medicationCodeableConcept: {
-      coding: [
-        {
-          system: 'urn:test:tw-exchange:medication-code',
-          code: input.medicationCode || 'ACET500',
-          display: input.medicationDisplay || 'Acetaminophen 500mg tablet'
-        }
-      ],
-      text: input.medicationText || input.medicationDisplay || '普拿疼 500mg 錠劑'
+      ...(input.medicationCode
+        ? {
+            coding: [
+              {
+                system: 'urn:test:tw-exchange:medication-code',
+                code: input.medicationCode,
+                ...(input.medicationDisplay ? { display: input.medicationDisplay } : {})
+              }
+            ]
+          }
+        : {}),
+      text: input.medicationText
     },
     subject: reference('Patient', input.patientId),
     encounter: reference('Encounter', input.encounterId),

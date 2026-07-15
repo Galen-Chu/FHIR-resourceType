@@ -22,18 +22,18 @@
         <option value="unknown">unknown</option>
       </select>
     </div>
-    <button class="primary" :disabled="loading" @click="submit">
+    <button class="primary" :disabled="loading || !canSubmit" @click="submit">
       {{ loading ? '建立中…' : '送出建立' }}
     </button>
   </div>
 
-  <JsonPreviewPanel endpoint="/practitioners" :payload="form" filename="practitioner" />
+  <JsonPreviewPanel endpoint="/practitioners" :payload="form" :disabled="!canSubmit" filename="practitioner" />
 
   <ResourceResultCard :result="result" />
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import api from '../api';
 import { registerResource } from '../store';
 import ResourceResultCard from '../components/ResourceResultCard.vue';
@@ -42,6 +42,7 @@ import JsonPreviewPanel from '../components/JsonPreviewPanel.vue';
 const form = reactive({ family: '', given: '', gender: 'male' });
 const result = ref(null);
 const loading = ref(false);
+const canSubmit = computed(() => form.family && form.given);
 
 async function submit() {
   loading.value = true;
@@ -50,8 +51,7 @@ async function submit() {
     const r = await api.post('/practitioners', { ...form });
     result.value = r.data;
     if (r.data.id) {
-      const name = `${form.family || '王'}${form.given || '大明'}`;
-      registerResource('Practitioner', r.data.id, `${name}（Practitioner/${r.data.id}）`);
+      registerResource('Practitioner', r.data.id, `${form.family}${form.given}（Practitioner/${r.data.id}）`);
     }
   } catch (err) {
     result.value = { status: 0, error: err.message };

@@ -1,8 +1,9 @@
 // Organization（Organization-hosp-twcore）
 // 核心欄位：identifier、name、type（hosp）、active
-const { makeIdentifier, meta } = require('./common');
+const { makeIdentifier, meta, requireFields } = require('./common');
 
 function buildOrganization(input = {}) {
+  requireFields(input, ['name']);
   return {
     resourceType: 'Organization',
     meta: meta('Organization'),
@@ -20,7 +21,7 @@ function buildOrganization(input = {}) {
         text: '醫院'
       }
     ],
-    name: input.name || '測試醫院'
+    name: input.name
   };
 }
 

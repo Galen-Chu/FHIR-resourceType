@@ -1,11 +1,11 @@
 // Patient（Patient-twcore）
 // 核心欄位：identifier、name、gender、birthDate、address / telecom
 // 關鍵 reference：managingOrganization → Organization
-const { makeIdentifier, meta, reference } = require('./common');
+const { makeIdentifier, meta, reference, requireFields } = require('./common');
 
 function buildPatient(input = {}) {
-  const family = input.family || '陳';
-  const given = input.given || '小明';
+  requireFields(input, ['family', 'given', 'gender', 'birthDate', 'organizationId']);
+  const { family, given } = input;
   const resource = {
     resourceType: 'Patient',
     meta: meta('Patient'),
@@ -18,8 +18,9 @@ function buildPatient(input = {}) {
         given: [given]
       }
     ],
-    gender: input.gender || 'male',
-    birthDate: input.birthDate || '1990-01-01'
+    gender: input.gender,
+    birthDate: input.birthDate,
+    managingOrganization: reference('Organization', input.organizationId)
   };
 
   if (input.phone) {
@@ -27,9 +28,6 @@ function buildPatient(input = {}) {
   }
   if (input.address) {
     resource.address = [{ text: input.address, country: 'TW' }];
-  }
-  if (input.organizationId) {
-    resource.managingOrganization = reference('Organization', input.organizationId);
   }
   return resource;
 }

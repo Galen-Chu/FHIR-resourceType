@@ -4,6 +4,23 @@
 const crypto = require('crypto');
 const { PROFILES } = require('../config');
 
+// 缺必填欄位時由 route 層轉為 400 + OperationOutcome（貼近聯測實況，
+// 不以預設值靜默補齊，避免「前端沒把資料帶到」的 bug 被掩蓋）
+class ValidationError extends Error {
+  constructor(missing) {
+    super(`缺少必填欄位：${missing.join('、')}`);
+    this.name = 'ValidationError';
+    this.missing = missing;
+  }
+}
+
+function requireFields(input, fields) {
+  const missing = fields.filter(
+    (f) => input[f] === undefined || input[f] === null || input[f] === ''
+  );
+  if (missing.length) throw new ValidationError(missing);
+}
+
 function randomValue(prefix) {
   return `${prefix}-${crypto.randomInt(10000000, 99999999)}`;
 }
@@ -23,4 +40,4 @@ function reference(resourceType, id) {
   return { reference: `${resourceType}/${id}` };
 }
 
-module.exports = { makeIdentifier, meta, reference, randomValue };
+module.exports = { makeIdentifier, meta, reference, randomValue, requireFields, ValidationError };

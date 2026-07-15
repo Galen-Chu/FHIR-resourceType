@@ -2,9 +2,10 @@
 // 核心欄位：status（in-progress/finished）、class（AMB）、period
 // 關鍵 reference：subject → Patient、serviceProvider → Organization、participant → Practitioner
 // 已確認：不建立 PractitionerRole，participant 直接引用 Practitioner
-const { makeIdentifier, meta, reference } = require('./common');
+const { makeIdentifier, meta, reference, requireFields } = require('./common');
 
 function buildEncounter(input = {}) {
+  requireFields(input, ['patientId', 'organizationId', 'practitionerId']);
   const now = new Date().toISOString();
   const resource = {
     resourceType: 'Encounter',
@@ -20,11 +21,8 @@ function buildEncounter(input = {}) {
     period: {
       start: input.periodStart || now,
       ...(input.periodEnd ? { end: input.periodEnd } : {})
-    }
-  };
-
-  if (input.practitionerId) {
-    resource.participant = [
+    },
+    participant: [
       {
         type: [
           {
@@ -39,11 +37,10 @@ function buildEncounter(input = {}) {
         ],
         individual: reference('Practitioner', input.practitionerId)
       }
-    ];
-  }
-  if (input.organizationId) {
-    resource.serviceProvider = reference('Organization', input.organizationId);
-  }
+    ],
+    serviceProvider: reference('Organization', input.organizationId)
+  };
+
   return resource;
 }
 

@@ -1,10 +1,10 @@
 // Practitioner（Practitioner-twcore）
 // 核心欄位：identifier、name（family/given）、gender
-const { makeIdentifier, meta } = require('./common');
+const { makeIdentifier, meta, requireFields } = require('./common');
 
 function buildPractitioner(input = {}) {
-  const family = input.family || '王';
-  const given = input.given || '大明';
+  requireFields(input, ['family', 'given', 'gender']);
+  const { family, given } = input;
   return {
     resourceType: 'Practitioner',
     meta: meta('Practitioner'),
@@ -17,7 +17,7 @@ function buildPractitioner(input = {}) {
         given: [given]
       }
     ],
-    gender: input.gender || 'male'
+    gender: input.gender
   };
 }
 

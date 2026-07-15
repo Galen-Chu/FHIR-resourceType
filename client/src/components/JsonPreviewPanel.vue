@@ -58,6 +58,10 @@ async function generate() {
     const r = await api.post(`${props.endpoint}/preview`, body);
     if (r.status >= 200 && r.status < 300) {
       json.value = JSON.stringify(r.data, null, 2);
+    } else if (r.data.outcome && r.data.outcome.resourceType === 'OperationOutcome') {
+      error.value = (r.data.outcome.issue || [])
+        .map((i) => (i.details && i.details.text) || i.diagnostics)
+        .join('\n');
     } else {
       error.value = r.data.error || `HTTP ${r.status}`;
     }

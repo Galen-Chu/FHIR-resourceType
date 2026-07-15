@@ -65,7 +65,7 @@ const form = reactive({
 });
 const result = ref(null);
 const loading = ref(false);
-const canSubmit = computed(() => form.patientId && form.encounterId);
+const canSubmit = computed(() => form.patientId && form.encounterId && form.icd10Code);
 
 // 「產生 JSON」與「送出建立」使用同一份 request body
 function buildBody() {

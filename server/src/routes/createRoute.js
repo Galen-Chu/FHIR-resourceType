@@ -4,6 +4,23 @@
 const express = require('express');
 const fhirClient = require('../fhirClient');
 const logger = require('../logger');
+const { ValidationError } = require('../builders/common');
+
+// 缺必填欄位時回傳與 FHIR Server 一致的 OperationOutcome 格式，
+// 前端紅色結果卡片可直接顯示
+function validationOutcome(err) {
+  return {
+    resourceType: 'OperationOutcome',
+    issue: [
+      {
+        severity: 'error',
+        code: 'required',
+        details: { text: err.message },
+        diagnostics: `missing required field(s): ${err.missing.join(', ')}`
+      }
+    ]
+  };
+}
 
 function createRoute(resourceType, builder) {
   const router = express.Router();
@@ -16,6 +33,10 @@ function createRoute(resourceType, builder) {
       logger.info(`⊙ Preview ${resourceType} JSON（未送出）`);
       res.json(resource);
     } catch (err) {
+      if (err instanceof ValidationError) {
+        res.status(400).json({ resourceType, status: 400, outcome: validationOutcome(err) });
+        return;
+      }
       res.status(400).json({ status: 400, error: `JSON 組裝失敗：${err.message}` });
     }
   });
@@ -40,6 +61,11 @@ function createRoute(resourceType, builder) {
         });
       }
     } catch (err) {
+      if (err instanceof ValidationError) {
+        logger.error(`POST /${resourceType} 必填欄位檢查失敗`, { missing: err.missing });
+        res.status(400).json({ resourceType, status: 400, outcome: validationOutcome(err) });
+        return;
+      }
       logger.error(`POST /${resourceType} failed`, { message: err.message });
       res.status(502).json({
         resourceType,
