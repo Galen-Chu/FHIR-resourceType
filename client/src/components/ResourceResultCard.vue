@@ -6,7 +6,8 @@
     </div>
     <div class="detail" v-if="ok">
       resourceType: {{ result.resourceType }}
-      id = {{ result.id }}
+      id = {{ result.id }}<template v-if="result.env">
+      env = {{ result.env }}</template>
     </div>
     <div class="detail" v-else>{{ errorMessage }}</div>
   </div>

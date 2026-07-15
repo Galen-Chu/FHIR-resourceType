@@ -21,14 +21,16 @@ function summarize(resource) {
 }
 
 module.exports = {
-  // 請求前：時間、方法、路徑、組裝後的 resource 摘要
-  request(method, path, resource) {
-    console.log(`[${timestamp()}]  → ${method} ${path}${resource ? '  ' + summarize(resource) : ''}`);
+  // 請求前：時間、目標環境、方法、路徑、組裝後的 resource 摘要
+  request(method, path, resource, env) {
+    const tag = env ? ` [${env}]` : '';
+    console.log(`[${timestamp()}]${tag}  → ${method} ${path}${resource ? '  ' + summarize(resource) : ''}`);
   },
 
   // 回應後：HTTP status、resource id 或錯誤訊息、耗時 (ms)
-  response(status, statusText, detail, ms) {
-    console.log(`[${timestamp()}]  ← ${status} ${statusText}  ${detail}  (${ms}ms)`);
+  response(status, statusText, detail, ms, env) {
+    const tag = env ? ` [${env}]` : '';
+    console.log(`[${timestamp()}]${tag}  ← ${status} ${statusText}  ${detail}  (${ms}ms)`);
   },
 
   info(message, data) {

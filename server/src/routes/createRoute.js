@@ -42,21 +42,24 @@ function createRoute(resourceType, builder) {
   });
 
   router.post('/', async (req, res) => {
+    const env = fhirClient.resolveEnv(req.get('X-FHIR-Env'));
     try {
       const resource = builder(req.body || {});
-      const r = await fhirClient.post(`/${resourceType}`, resource);
+      const r = await fhirClient.post(`/${resourceType}`, resource, env);
 
       if (r.status >= 200 && r.status < 300) {
         res.status(r.status).json({
           resourceType,
           id: r.data.id,
-          status: r.status
+          status: r.status,
+          env
         });
       } else {
         // 4xx/5xx：帶回 OperationOutcome 供前端顯示錯誤訊息
         res.status(r.status).json({
           resourceType,
           status: r.status,
+          env,
           outcome: r.data
         });
       }

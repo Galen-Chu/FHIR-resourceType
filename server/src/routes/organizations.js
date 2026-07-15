@@ -8,10 +8,13 @@ const createRoute = require('./createRoute');
 const router = createRoute('Organization', buildOrganization);
 
 router.get('/:id/patients', async (req, res) => {
+  const env = fhirClient.resolveEnv(req.get('X-FHIR-Env'));
   try {
-    const r = await fhirClient.get('/Patient', {
-      organization: `Organization/${req.params.id}`
-    });
+    const r = await fhirClient.get(
+      '/Patient',
+      { organization: `Organization/${req.params.id}` },
+      env
+    );
 
     if (r.status >= 200 && r.status < 300) {
       const entries = (r.data.entry || []).map((e) => {

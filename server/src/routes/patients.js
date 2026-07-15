@@ -8,8 +8,9 @@ const createRoute = require('./createRoute');
 const router = createRoute('Patient', buildPatient);
 
 router.get('/:id', async (req, res) => {
+  const env = fhirClient.resolveEnv(req.get('X-FHIR-Env'));
   try {
-    const r = await fhirClient.get(`/Patient/${encodeURIComponent(req.params.id)}`);
+    const r = await fhirClient.get(`/Patient/${encodeURIComponent(req.params.id)}`, undefined, env);
 
     if (r.status >= 200 && r.status < 300) {
       res.json({ status: r.status, patient: r.data });

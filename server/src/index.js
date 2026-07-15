@@ -14,7 +14,19 @@ app.use(express.json());
 app.use(morgan('[:date[iso]]  :method :url :status :response-time ms'));
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', fhirBaseUrl: config.FHIR_BASE_URL });
+  res.json({ status: 'ok', defaultEnv: config.DEFAULT_FHIR_ENV, servers: config.FHIR_SERVERS });
+});
+
+// 提供前端環境選擇器的清單
+app.get('/api/config/fhir-servers', (req, res) => {
+  res.json({
+    default: config.DEFAULT_FHIR_ENV,
+    servers: Object.entries(config.FHIR_SERVERS).map(([key, s]) => ({
+      key,
+      label: s.label,
+      url: s.url
+    }))
+  });
 });
 
 app.use('/api/organizations', require('./routes/organizations'));

@@ -61,6 +61,32 @@ body {
   font-size: 14px;
 }
 
+.sidebar .env-select {
+  padding: 4px 20px 6px;
+}
+
+.sidebar .env-select select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 13px;
+}
+
+.sidebar .env-select option {
+  color: var(--text);
+}
+
+.sidebar .env-url {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--accent-light);
+  word-break: break-all;
+  opacity: 0.85;
+}
+
 .sidebar a.router-link-active {
   background: rgba(95, 224, 208, 0.15);
   color: var(--accent-light);
