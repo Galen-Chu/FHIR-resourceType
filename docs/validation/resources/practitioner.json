@@ -1,0 +1,25 @@
+{
+  "resourceType": "Practitioner",
+  "meta": {
+    "profile": [
+      "https://twcore.mohw.gov.tw/ig/twcore/StructureDefinition/Practitioner-twcore"
+    ]
+  },
+  "identifier": [
+    {
+      "system": "urn:test:tw-exchange:practitioner-id",
+      "value": "tw-prac-93346608"
+    }
+  ],
+  "active": true,
+  "name": [
+    {
+      "text": "王大明",
+      "family": "王",
+      "given": [
+        "大明"
+      ]
+    }
+  ],
+  "gender": "male"
+}

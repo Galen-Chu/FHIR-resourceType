@@ -180,6 +180,37 @@ npm run dev
 - **回應後**：HTTP status、resource id 或錯誤訊息、耗時 (ms)
 - **實作**：`morgan` 記錄 HTTP 存取層；自訂 `logger.js` 記錄 FHIR 交換細節
 
+## FHIR Server 環境切換
+
+前端側邊欄可切換資源寫入/查詢的目標環境，選擇隨每個請求以 `X-FHIR-Env` header 帶到後端：
+
+| 環境 key | 名稱 | Base URL |
+| --- | --- | --- |
+| `twcore`（預設） | 台灣 TW Core 測試站 | `https://twcore.hapi.fhir.tw/fhir` |
+| `hapi-org` | HAPI 國際公開站（R4） | `https://hapi.fhir.org/baseR4` |
+
+- 「已建立資源登錄簿」依環境隔離：twcore 建立的資源 id 不會出現在 hapi-org 的
+  下拉選單，避免跨環境無效 reference
+- 交換 Log 每行標記目標環境（`[twcore]` / `[hapi-org]`）
+- 環境清單與 URL 可用環境變數覆蓋（`FHIR_URL_TWCORE`、`FHIR_URL_HAPI_ORG`、`FHIR_ENV`）
+
+## 驗證證據（docs/validation/）
+
+`server` 內建驗證證據產出工具：
+
+```bash
+cd server
+npm run validate                  # 產出七種資源 JSON → docs/validation/resources/
+npm run validate -- --env twcore  # 加打 HAPI $validate，報告存 docs/validation/reports/twcore/
+npm run validate -- --env all     # 對兩個環境都驗證
+```
+
+另可把 `docs/validation/resources/` 的 JSON 貼到
+[validator.fhir.org](https://validator.fhir.org/) 截圖存證；
+實際寫入的交換 Log 會同步存到 `server/logs/exchange.log`，
+複製到 `docs/validation/logs/` 即完成存證。詳見
+[docs/validation/README.md](docs/validation/README.md)。
+
 ## 已確認事項（規格書 §09）
 
 1. **identifier 設計** — 不使用真實個資／機構代碼。`identifier.system` 採測試專用

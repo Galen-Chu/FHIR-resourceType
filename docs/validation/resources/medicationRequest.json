@@ -1,0 +1,58 @@
+{
+  "resourceType": "MedicationRequest",
+  "meta": {
+    "profile": [
+      "https://twcore.mohw.gov.tw/ig/twcore/StructureDefinition/MedicationRequest-twcore"
+    ]
+  },
+  "identifier": [
+    {
+      "system": "urn:test:tw-exchange:medication-request-id",
+      "value": "tw-medrq-24834619"
+    }
+  ],
+  "status": "active",
+  "intent": "order",
+  "medicationCodeableConcept": {
+    "coding": [
+      {
+        "system": "urn:test:tw-exchange:medication-code",
+        "code": "ACET500",
+        "display": "Acetaminophen 500mg tablet"
+      }
+    ],
+    "text": "普拿疼 500mg 錠劑"
+  },
+  "subject": {
+    "reference": "Patient/example-patient-id"
+  },
+  "encounter": {
+    "reference": "Encounter/example-encounter-id"
+  },
+  "requester": {
+    "reference": "Practitioner/example-practitioner-id"
+  },
+  "authoredOn": "2026-07-01T09:20:00+08:00",
+  "dosageInstruction": [
+    {
+      "text": "每日三次，每次一錠，飯後服用",
+      "timing": {
+        "repeat": {
+          "frequency": 3,
+          "period": 1,
+          "periodUnit": "d"
+        }
+      },
+      "route": {
+        "coding": [
+          {
+            "system": "http://snomed.info/sct",
+            "code": "26643006",
+            "display": "Oral route"
+          }
+        ],
+        "text": "口服"
+      }
+    }
+  ]
+}

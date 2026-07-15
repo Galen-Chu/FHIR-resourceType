@@ -1,0 +1,42 @@
+{
+  "resourceType": "Patient",
+  "meta": {
+    "profile": [
+      "https://twcore.mohw.gov.tw/ig/twcore/StructureDefinition/Patient-twcore"
+    ]
+  },
+  "identifier": [
+    {
+      "system": "urn:test:tw-exchange:patient-id",
+      "value": "tw-pat-14888282"
+    }
+  ],
+  "active": true,
+  "name": [
+    {
+      "text": "陳小明",
+      "family": "陳",
+      "given": [
+        "小明"
+      ]
+    }
+  ],
+  "gender": "male",
+  "birthDate": "1990-01-01",
+  "managingOrganization": {
+    "reference": "Organization/example-organization-id"
+  },
+  "telecom": [
+    {
+      "system": "phone",
+      "value": "0912345678",
+      "use": "mobile"
+    }
+  ],
+  "address": [
+    {
+      "text": "臺北市大安區仁愛路一段 1 號",
+      "country": "TW"
+    }
+  ]
+}
