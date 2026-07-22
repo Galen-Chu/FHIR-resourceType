@@ -5,6 +5,8 @@
 一次性建置七種 ResourceType，符合 **TW Core IG** 規範，可在
 **台灣 TW Core 測試站**與 **HAPI 國際公開站**之間自由切換寫入/查詢目標，
 並提供 JSON 規格預覽、驗證證據產出工具與 CDS Hooks 臨床決策支援端點。
+v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、IG 矩陣、鑑權去重等）；
+異構資料清洗與 Python 子系統合流則規劃於 v5。詳見下方[擴充藍圖](#擴充藍圖v4--v5-規劃中)。
 
 | 項目 | 內容 |
 | --- | --- |
@@ -14,6 +16,37 @@
 | FHIR Server | 雙環境可切換：`twcore.hapi.fhir.tw/fhir`（預設）/ `hapi.fhir.org/baseR4`（FHIR R4） |
 | 臨床決策支援 | CDS Hooks（patient-view、order-select） |
 | 驗證 | JSON 規格預覽、`$validate` 批次驗證工具、結構化 Log 存證 |
+
+## 擴充藍圖（v4 / v5 規劃中）
+
+本專案定位為「醫療中介軟體（Middleware）」的完整實作佐證，目前 v1–v3
+涵蓋了資源建立、JSON 預覽、環境切換、驗證證據與 CDS Hooks。剩餘缺口依
+「是否會被 v5 系統合流重做」拆為兩個階段，避免同一段清洗邏輯先用 JS 寫一次、
+合流時又用 Python 重寫一次：
+
+- **v4**：在現有 Node.js/Vue 技術棧內完成，皆為 Express Gateway／builder 層
+  的邏輯，與未來是否合流無關，現在做不會被推翻
+- **v5**：與 `FHIR-bioMedData`（Python 清洗引擎）合流時一併實作，讓異構資料
+  清洗直接以 Python 一次到位
+
+（🔴 核心賣點／🟠 高優先／🟡 中優先，狀態即時更新於下方版本演進紀錄）：
+
+### v4 — Node 端寫入強健度（現有技術棧內完成）
+
+| 優先級 | 項目 | 現況 | 說明 |
+| --- | --- | --- | --- |
+| 🔴 | Upsert 覆寫機制 | 規劃中 | 依 `identifier` 判斷資源已存在則更新、不存在則新增；同 identifier 的併發寫入以序列化佇列防止 Race Condition |
+| 🟠 | IG Profile 切換矩陣 | 規劃中 | `PROFILES` 由寫死單組改為依 IG 版本（TW Core 版號 / 未來可擴充其他 Core IG）動態組裝，前端可選擇目標 IG |
+| 🟠 | 鑑權與去重防禦 | 規劃中 | 落實 `FHIR_AUTH_TOKEN` Bearer Token 流程；寫入前依 identifier 做去重檢查，防止外部來源重複資料落庫 |
+| 🟡 | ISO 8601 時間格式校準層 | 規劃中 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period` 等）統一格式驗證與校準，取代目前的直接透傳。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
+| 🟡 | CLI + Streamlit 即時監控台 | 規劃中 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `logs/exchange.log` 即時視覺化建立數、環境分布、CDS 觸發次數；僅唯讀觀測、不參與主資料流，作為 v5 合流前先驗證 Node + Python 於同一 repo 共存的暖身 |
+| 🟡 | CI/CD 與版本釋出控制 | 規劃中 | GitHub Actions（lint + 測試 + `npm run validate`）、語意化版本 tag、CHANGELOG.md |
+
+### v5 — 系統合流與異構資料清洗（規劃中）
+
+| 優先級 | 項目 | 現況 | 說明 |
+| --- | --- | --- | --- |
+| 🔴 | 異構資料清洗前置層 | 規劃中 | 與 `FHIR-bioMedData` 合流：移植其 Config Matrix（院所欄位對齊、性別字典、民國年轉換）為清洗前置層，新增 `POST /api/ingest/{resource}` 讀取 HIS/LIS 風格異構 CSV/JSON，正規化後呼叫既有 builder 產出 TW Core 資源；直接以 Python 實作，避免 v4 階段用 JS 重工 |
 
 ## 系統架構
 
@@ -295,3 +328,29 @@ npm run validate -- --env all     # 對兩個環境都驗證
 | 3 | 建議 2 | 交換 Log 同步寫入 `logs/exchange.log`，每行標記目標環境 |
 | 4 | 建議 1 | `npm run validate`：批次產出資源 JSON 與 `$validate` 報告至 `docs/validation/` |
 | 5 | 建議 3 | CDS Hooks：discovery + patient-summary（生命徵象警示）+ medication-duplicate-check（重複用藥） |
+
+### v4 — 寫入強健度擴充（規劃中，現有技術棧內完成）
+
+聚焦「醫療中介軟體」尚未覆蓋的寫入強健度：防禦併發寫入造成的髒資料、
+標準規格深度、觀測工具。皆為 Express Gateway／builder 層邏輯，與 v5 是否
+合流無關。項目與優先級詳見上方[擴充藍圖](#擴充藍圖v4--v5-規劃中)，開發順序：
+
+1. Upsert 覆寫機制 + 併發序列化寫入
+2. IG Profile 切換矩陣
+3. 鑑權與去重防禦
+4. ISO 8601 時間格式校準層（結構化輸入部分）
+5. CLI + Streamlit 即時監控台
+6. CI/CD 與版本釋出控制
+
+### v5 — 系統合流與異構資料清洗（規劃中）
+
+與 `FHIR-bioMedData`（Python 清洗引擎）合流，補上「接收異構外部資料源」
+這塊能力，讓專案完整涵蓋「異構清洗 → API 網關 → FHIR 標準化落庫」的
+端到端流程：
+
+1. 移植 Config Matrix（院所欄位對齊、性別字典、民國年轉換）為 Python
+   清洗前置層
+2. 新增 `POST /api/ingest/{resource}`：清洗結果串接既有 v1–v4 builder /
+   Upsert / IG 矩陣邏輯，不重複實作寫入層
+
+各項目完成後會更新對應狀態欄位（規劃中 → 已完成）並移至上方版本表中。
