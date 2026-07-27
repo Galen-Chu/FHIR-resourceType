@@ -4,3 +4,10 @@ dist/
 *.log
 server/logs/
 .DS_Store
+
+# Python（monitor/，v4 第 5 項）
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/

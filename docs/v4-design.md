@@ -374,7 +374,13 @@ server/test/dateUtils.test.js
 
 ---
 
-## 5. CLI + Streamlit 即時監控台
+## 5. CLI + Streamlit 即時監控台 ✅ 已完成
+
+> 實作與設計稿大致一致，一項計畫外的補充：CDS Hooks 觸發次數原本設計
+> 「若 log 有 CDS 呼叫記錄」才統計，但 `cds/index.js` 原本只有失敗時
+> 才呼叫 `logger.error`，成功呼叫完全沒留下痕跡，統計出來會永遠是 0、
+> 是個空承諾的假數據。已補上兩行 `logger.info` 標記，讓這個統計真的有
+> 意義；用實際觸發一次 CDS Hook 呼叫驗證過統計會正確更新。
 
 ### 定位
 

@@ -16,7 +16,8 @@ v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、I
 | FHIR Server | 雙環境可切換：`twcore.hapi.fhir.tw/fhir`（預設）/ `hapi.fhir.org/baseR4`（FHIR R4） |
 | 臨床決策支援 | CDS Hooks（patient-view、order-select） |
 | 驗證 | JSON 規格預覽、`$validate` 批次驗證工具、結構化 Log 存證 |
-| 測試 | Jest（server 端單元測試，v4 起導入） |
+| 測試 | Jest（server 端）、Pytest（`monitor/`，v4 起導入） |
+| 監控 | Streamlit 即時數據池監控台（`monitor/`，選用、獨立唯讀，v4） |
 
 ## 擴充藍圖（v4 / v5 規劃中）
 
@@ -40,7 +41,7 @@ v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、I
 | 🟠 | IG Profile 切換矩陣 | ✅ 已完成 | `PROFILES` 改為 `IG_PROFILES` 矩陣（`tw-core` / `r4-base`），新增 `X-FHIR-IG` header 與既有 `X-FHIR-Env` 環境切換平行運作、可交叉組合；前端側邊欄新增 IG 選擇器 |
 | 🟠 | 鑑權與去重防禦 | ✅ 已完成 | 新增 Gateway 自身的 `X-Gateway-Key` 鑑權（選用）；上游 401/403 明確診斷 log；Upsert 遇到 412（identifier 對應多筆既有資源）轉譯為 `409` + 明確錯誤訊息 |
 | 🟡 | ISO 8601 時間格式校準層 | ✅ 已完成 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period`、`onsetDateTime`）統一格式驗證與校準，取代原本的直接透傳；手動曆法檢查攔截不存在的日期（如 2/30、非閏年 2/29），不依賴 `Date` 物件的寬鬆解析。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
-| 🟡 | CLI + Streamlit 即時監控台 | 規劃中 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `logs/exchange.log` 即時視覺化建立數、環境分布、CDS 觸發次數；僅唯讀觀測、不參與主資料流，作為 v5 合流前先驗證 Node + Python 於同一 repo 共存的暖身 |
+| 🟡 | CLI + Streamlit 即時監控台 | ✅ 已完成 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `server/logs/exchange.log` 即時視覺化建立數、環境分布、成功率、回應時間、CDS Hooks 觸發次數；僅唯讀觀測、不參與主資料流，是本 repo 首次引入 Pytest 之處，也是 v5 合流前驗證 Node + Python 於同一 repo 共存的暖身 |
 | 🟡 | CI/CD 與版本釋出控制 | 規劃中 | GitHub Actions（lint + 測試 + `npm run validate`）、語意化版本 tag、CHANGELOG.md |
 
 ### v5 — 系統合流與異構資料清洗（規劃中）
@@ -125,6 +126,11 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 │  │  ├─ api.js / router.js / App.vue / main.js / style.css
 │  ├─ .env.example
 │  └─ package.json
+├─ monitor/                     # CLI + Streamlit 即時監控台（v4，Python，獨立唯讀）
+│  ├─ parser.py                 #   exchange.log 逐行解析（純函式）
+│  ├─ dashboard.py              #   Streamlit 進入點
+│  ├─ tests/test_parser.py      #   Pytest（本 repo 首次引入）
+│  └─ requirements.txt
 ├─ docs/
 │  ├─ v4-design.md              # v4 六項技術設計草案
 │  └─ validation/               # 驗證證據：resources / reports / screenshots / logs
@@ -151,6 +157,16 @@ cd client
 npm install
 cp .env.example .env     # VITE_API_BASE=http://localhost:3000/api
 npm run dev
+```
+
+### 3. 啟動監控台（選用，http://localhost:8501，v4）
+
+獨立唯讀工具，只讀後端寫出的 `server/logs/exchange.log`：
+
+```bash
+cd monitor
+pip install -r requirements.txt
+streamlit run dashboard.py
 ```
 
 ## 建立順序 · 相依圖
@@ -383,8 +399,31 @@ npm run validate -- --env all     # 對兩個環境都驗證
 2. ✅ IG Profile 切換矩陣
 3. ✅ 鑑權與去重防禦
 4. ✅ ISO 8601 時間格式校準層（結構化輸入部分）
-5. CLI + Streamlit 即時監控台
+5. ✅ CLI + Streamlit 即時監控台
 6. CI/CD 與版本釋出控制
+
+#### v4.5 — CLI + Streamlit 即時監控台（已完成）
+
+獨立唯讀輔助工具，只讀 `server/logs/exchange.log`，不呼叫任何 API、不參與
+主資料流，維持核心系統 Node.js/Vue 技術棧的單一性：
+
+- `monitor/parser.py`：log 逐行解析（純函式，與畫面渲染分離，方便獨立
+  測試），辨識三種事件：request（`→`）、response（`←`）、CDS Hook
+  觸發（`⚕`，新增的可辨識標記）
+  - 手動曆法檢查等級的細節：解析時沒有依賴 Python 內建日期解析（避免
+    重蹈 v4.1 遇到的 `Date` 寬鬆解析問題），純粹用 regex 拆欄位
+- `server/src/cds/index.js` 補上兩行 `logger.info` 標記 CDS Hook 觸發
+  事件——原本底層查詢已由 `fhirClient` 自動記錄一般 GET request/response，
+  但無法單從那兩行辨識「這是 CDS Hook 觸發的」，所以額外標記
+- `monitor/dashboard.py`：Streamlit 進入點，畫面含累積請求數、成功率、
+  平均回應時間、CDS Hooks 觸發次數、依環境分布長條圖、成功/失敗比例、
+  回應時間趨勢、即時 log 串流表格（最新在上）；每 5 秒自動重新整理
+- 16 個 Pytest 測試案例，以真實跑過的 `exchange.log` 內容（含 URL
+  編碼的 query string、sandbox proxy 攔截時的空 detail 欄位等真實邊界
+  情境）驗證 parser 正確性——本 repo 首次引入 Pytest
+- 實際起 `streamlit run` + Playwright 截圖驗證：畫面正確渲染、無
+  Python 例外；並實際觸發一次 CDS Hook 呼叫，確認「累積請求數」與
+  「CDS Hooks 觸發次數」統計在自動重新整理後正確更新（3→7、0→1）
 
 #### v4.4 — 鑑權與去重防禦（已完成）
 

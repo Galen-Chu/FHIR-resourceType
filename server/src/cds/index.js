@@ -49,6 +49,10 @@ router.get('/', (req, res) => {
 
 router.post('/patient-summary', async (req, res) => {
   const env = resolveEnv(req);
+  // 標記 CDS Hook 觸發事件（v4：供 monitor/ 監控台統計呼叫次數；
+  // GET /Condition 等底層查詢已由 fhirClient 自動記錄，這裡只補一行
+  // 可辨識「這是哪個 CDS 服務」的標記）
+  logger.info(`⚕ CDS Hook 呼叫：patient-summary [${env}]`);
   const context = (req.body && req.body.context) || {};
   if (!context.patientId) {
     res.status(400).json({ error: 'context.patientId 為必填' });
@@ -65,6 +69,7 @@ router.post('/patient-summary', async (req, res) => {
 
 router.post('/medication-duplicate-check', async (req, res) => {
   const env = resolveEnv(req);
+  logger.info(`⚕ CDS Hook 呼叫：medication-duplicate-check [${env}]`);
   const context = (req.body && req.body.context) || {};
   if (!context.patientId) {
     res.status(400).json({ error: 'context.patientId 為必填' });
