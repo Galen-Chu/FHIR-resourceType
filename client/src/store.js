@@ -1,14 +1,21 @@
-// 環境切換 + 已建立資源登錄簿
+// 環境切換 + IG 切換 + 已建立資源登錄簿
 // - currentEnv：目前選擇的 FHIR Server 環境（twcore / hapi-org），存 localStorage
+// - currentIG：目前選擇的 IG Profile 矩陣（tw-core / r4-base），存 localStorage。
+//   與 currentEnv 是獨立維度，不影響登錄簿隔離規則（登錄簿只依 env 隔離，
+//   同一筆資源用不同 ig 組裝出的內容差異只在 meta.profile）
 // - 登錄簿依環境隔離：twcore 建立的資源 id 在 hapi-org 上不存在，
 //   切換環境後下拉選單只顯示該環境建立過的資源，避免跨環境無效 reference
 import { reactive, ref, computed, watch } from 'vue';
 
 const ENV_KEY = 'fhir-exchange-env';
+const IG_KEY = 'fhir-exchange-ig';
 const STORAGE_KEY = 'fhir-exchange-created-resources';
 
 export const currentEnv = ref(localStorage.getItem(ENV_KEY) || 'twcore');
 watch(currentEnv, (v) => localStorage.setItem(ENV_KEY, v));
+
+export const currentIG = ref(localStorage.getItem(IG_KEY) || 'tw-core');
+watch(currentIG, (v) => localStorage.setItem(IG_KEY, v));
 
 const RESOURCE_TYPES = [
   'Organization',

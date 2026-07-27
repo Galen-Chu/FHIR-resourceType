@@ -4,12 +4,12 @@
 const { makeIdentifier, meta, reference, requireFields } = require('./common');
 const { toIsoDate } = require('./dateUtils');
 
-function buildPatient(input = {}) {
+function buildPatient(input = {}, ig) {
   requireFields(input, ['family', 'given', 'gender', 'birthDate', 'organizationId']);
   const { family, given } = input;
   const resource = {
     resourceType: 'Patient',
-    meta: meta('Patient'),
+    meta: meta('Patient', ig),
     identifier: [makeIdentifier('patient', 'tw-pat')],
     active: true,
     name: [

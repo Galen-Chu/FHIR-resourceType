@@ -109,7 +109,7 @@ async function main() {
   fs.mkdirSync(resourcesDir, { recursive: true });
   const resources = {};
   for (const [name, builder] of Object.entries(builders)) {
-    const resource = builder(SAMPLE_INPUTS[name]);
+    const resource = builder(SAMPLE_INPUTS[name], config.DEFAULT_IG);
     resources[name] = resource;
     const file = path.join(resourcesDir, `${name}.json`);
     fs.writeFileSync(file, JSON.stringify(resource, null, 2) + '\n');

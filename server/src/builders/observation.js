@@ -3,11 +3,11 @@
 // 關鍵 reference：subject → Patient、encounter → Encounter
 const { makeIdentifier, meta, reference, requireFields } = require('./common');
 
-function buildObservation(input = {}) {
+function buildObservation(input = {}, ig) {
   requireFields(input, ['patientId', 'encounterId', 'loincCode', 'value']);
   return {
     resourceType: 'Observation',
-    meta: meta('Observation'),
+    meta: meta('Observation', ig),
     identifier: [makeIdentifier('observation', 'tw-obs')],
     status: input.status || 'final',
     category: [

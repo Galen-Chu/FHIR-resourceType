@@ -37,7 +37,7 @@ v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、I
 | 優先級 | 項目 | 現況 | 說明 |
 | --- | --- | --- | --- |
 | 🔴 | Upsert 覆寫機制 | 規劃中 | 依 `identifier` 判斷資源已存在則更新、不存在則新增；同 identifier 的併發寫入以序列化佇列防止 Race Condition |
-| 🟠 | IG Profile 切換矩陣 | 規劃中 | `PROFILES` 由寫死單組改為依 IG 版本（TW Core 版號 / 未來可擴充其他 Core IG）動態組裝，前端可選擇目標 IG |
+| 🟠 | IG Profile 切換矩陣 | ✅ 已完成 | `PROFILES` 改為 `IG_PROFILES` 矩陣（`tw-core` / `r4-base`），新增 `X-FHIR-IG` header 與既有 `X-FHIR-Env` 環境切換平行運作、可交叉組合；前端側邊欄新增 IG 選擇器 |
 | 🟠 | 鑑權與去重防禦 | 規劃中 | 落實 `FHIR_AUTH_TOKEN` Bearer Token 流程；寫入前依 identifier 做去重檢查，防止外部來源重複資料落庫 |
 | 🟡 | ISO 8601 時間格式校準層 | ✅ 已完成 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period`、`onsetDateTime`）統一格式驗證與校準，取代原本的直接透傳；手動曆法檢查攔截不存在的日期（如 2/30、非閏年 2/29），不依賴 `Date` 物件的寬鬆解析。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
 | 🟡 | CLI + Streamlit 即時監控台 | 規劃中 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `logs/exchange.log` 即時視覺化建立數、環境分布、CDS 觸發次數；僅唯讀觀測、不參與主資料流，作為 v5 合流前先驗證 Node + Python 於同一 repo 共存的暖身 |
@@ -354,11 +354,27 @@ npm run validate -- --env all     # 對兩個環境都驗證
 合流無關。項目與優先級詳見上方[擴充藍圖](#擴充藍圖v4--v5-規劃中)，開發順序：
 
 1. Upsert 覆寫機制 + 併發序列化寫入
-2. IG Profile 切換矩陣
+2. ✅ IG Profile 切換矩陣
 3. 鑑權與去重防禦
 4. ✅ ISO 8601 時間格式校準層（結構化輸入部分）
 5. CLI + Streamlit 即時監控台
 6. CI/CD 與版本釋出控制
+
+#### v4.2 — IG Profile 切換矩陣（已完成）
+
+- `config.js` 的 `PROFILES`（單組 TW Core URL）改為 `IG_PROFILES` 矩陣：
+  `tw-core`（既有 7 種 TW Core Profile）與 `r4-base`（不掛任何自訂
+  Profile，對應 hapi.fhir.org 未載入 TW Core 驗證規則的現況）
+- 新增 `server/src/igResolver.js`（`resolveIG`），與 `fhirClient.resolveEnv`
+  平行：`X-FHIR-Env` 決定寫去哪個 Server、`X-FHIR-IG` 決定用哪組 Profile
+  組裝資源，兩者是獨立維度，可交叉組合
+- 7 個 builder 的 `meta(resourceType)` 改為 `meta(resourceType, ig)`；
+  未帶 `ig` 時退回 `DEFAULT_IG`，向下相容既有呼叫方式（`scripts/validate-all.js`
+  等既有呼叫點不受影響）
+- 新增 `GET /api/config/fhir-igs`，前端側邊欄新增 IG 選擇器（與環境選擇器
+  並列），選擇結果存 localStorage、隨每個請求以 `X-FHIR-IG` header 帶入
+- 9 個 Jest 測試案例 + Playwright 瀏覽器端到端驗證（切換選單 →
+  header 隨之改變 → 預覽 JSON 正確帶/不帶 `meta.profile`）
 
 #### v4.1 — ISO 8601 時間格式校準層（已完成）
 

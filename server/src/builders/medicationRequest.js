@@ -3,11 +3,11 @@
 // 關鍵 reference：subject → Patient、encounter → Encounter、requester → Practitioner
 const { makeIdentifier, meta, reference, requireFields } = require('./common');
 
-function buildMedicationRequest(input = {}) {
+function buildMedicationRequest(input = {}, ig) {
   requireFields(input, ['patientId', 'encounterId', 'practitionerId', 'medicationText']);
   return {
     resourceType: 'MedicationRequest',
-    meta: meta('MedicationRequest'),
+    meta: meta('MedicationRequest', ig),
     identifier: [makeIdentifier('medication-request', 'tw-medrq')],
     status: input.status || 'active',
     intent: 'order',

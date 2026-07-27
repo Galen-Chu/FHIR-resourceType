@@ -5,12 +5,12 @@
 const { makeIdentifier, meta, reference, requireFields } = require('./common');
 const { toIsoDateTime } = require('./dateUtils');
 
-function buildEncounter(input = {}) {
+function buildEncounter(input = {}, ig) {
   requireFields(input, ['patientId', 'organizationId', 'practitionerId']);
   const now = new Date().toISOString();
   const resource = {
     resourceType: 'Encounter',
-    meta: meta('Encounter'),
+    meta: meta('Encounter', ig),
     identifier: [makeIdentifier('encounter', 'tw-enc')],
     status: input.status || 'in-progress',
     class: {

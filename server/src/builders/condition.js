@@ -4,11 +4,11 @@
 const { makeIdentifier, meta, reference, requireFields } = require('./common');
 const { toIsoDateTime } = require('./dateUtils');
 
-function buildCondition(input = {}) {
+function buildCondition(input = {}, ig) {
   requireFields(input, ['patientId', 'encounterId', 'icd10Code']);
   return {
     resourceType: 'Condition',
-    meta: meta('Condition'),
+    meta: meta('Condition', ig),
     identifier: [makeIdentifier('condition', 'tw-cond')],
     clinicalStatus: {
       coding: [

@@ -2,11 +2,11 @@
 // 核心欄位：identifier、name、type（hosp）、active
 const { makeIdentifier, meta, requireFields } = require('./common');
 
-function buildOrganization(input = {}) {
+function buildOrganization(input = {}, ig) {
   requireFields(input, ['name']);
   return {
     resourceType: 'Organization',
-    meta: meta('Organization'),
+    meta: meta('Organization', ig),
     identifier: [makeIdentifier('organization', 'tw-org')],
     active: input.active !== undefined ? Boolean(input.active) : true,
     type: [

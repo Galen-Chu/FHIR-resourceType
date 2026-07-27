@@ -29,6 +29,17 @@ app.get('/api/config/fhir-servers', (req, res) => {
   });
 });
 
+// 提供前端 IG 選擇器的清單（v4：IG Profile 切換矩陣）
+app.get('/api/config/fhir-igs', (req, res) => {
+  res.json({
+    default: config.DEFAULT_IG,
+    igs: Object.entries(config.IG_PROFILES).map(([key, ig]) => ({
+      key,
+      label: ig.label
+    }))
+  });
+});
+
 // CDS Hooks 依規格掛在根路徑（discovery: GET /cds-services）
 app.use('/cds-services', require('./cds'));
 

@@ -130,7 +130,11 @@ server/test/upsert.test.js
 
 ---
 
-## 2. IG Profile 切換矩陣
+## 2. IG Profile 切換矩陣 ✅ 已完成
+
+> 實作與設計稿一致，另加了 `GET /api/config/fhir-igs` 與前端 IG 選擇器
+> UI（設計稿原本只提到「前端側邊欄加一個 IG 選擇器」，實作時一併完成
+> 對應的後端清單端點，比照既有 `/api/config/fhir-servers` 的模式）。
 
 ### 現況問題
 

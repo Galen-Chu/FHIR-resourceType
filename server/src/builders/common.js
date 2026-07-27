@@ -2,7 +2,7 @@
 // identifier 設計（已確認）：不使用真實個資／機構代碼，
 // system 採測試專用命名空間 urn:test:tw-exchange:{resource}-id，value 由後端隨機亂數產生
 const crypto = require('crypto');
-const { PROFILES } = require('../config');
+const config = require('../config');
 
 // 欄位驗證失敗時由 route 層轉為 400 + OperationOutcome（貼近聯測實況，
 // 不以預設值靜默補齊，避免「前端沒把資料帶到」的 bug 被掩蓋）
@@ -35,8 +35,12 @@ function makeIdentifier(resourceKey, prefix) {
   };
 }
 
-function meta(resourceType) {
-  return { profile: [PROFILES[resourceType]] };
+// IG Profile 切換矩陣：ig 未帶或不存在時退回 DEFAULT_IG；該 IG 沒有為此
+// resourceType 定義 Profile 時（如 r4-base）不掛 meta，維持「陽春」FHIR 資源
+function meta(resourceType, ig) {
+  const igKey = config.IG_PROFILES[ig] ? ig : config.DEFAULT_IG;
+  const profile = config.IG_PROFILES[igKey].profiles[resourceType];
+  return profile ? { profile: [profile] } : undefined;
 }
 
 function reference(resourceType, id) {

@@ -3,6 +3,7 @@
 // → 回應整理成一致的 { id, status, resourceType } 格式
 const express = require('express');
 const fhirClient = require('../fhirClient');
+const { resolveIG } = require('../igResolver');
 const logger = require('../logger');
 const { ValidationError } = require('../builders/common');
 
@@ -30,9 +31,10 @@ function createRoute(resourceType, builder) {
   // 產生組裝後的 TW Core JSON（不呼叫 FHIR Server）
   // 供前端顯示、複製到 FHIR Validator 手動驗證資料格式
   router.post('/preview', (req, res) => {
+    const ig = resolveIG(req.get('X-FHIR-IG'));
     try {
-      const resource = builder(req.body || {});
-      logger.info(`⊙ Preview ${resourceType} JSON（未送出）`);
+      const resource = builder(req.body || {}, ig);
+      logger.info(`⊙ Preview ${resourceType} JSON（未送出，ig=${ig}）`);
       res.json(resource);
     } catch (err) {
       if (err instanceof ValidationError) {
@@ -45,8 +47,9 @@ function createRoute(resourceType, builder) {
 
   router.post('/', async (req, res) => {
     const env = fhirClient.resolveEnv(req.get('X-FHIR-Env'));
+    const ig = resolveIG(req.get('X-FHIR-IG'));
     try {
-      const resource = builder(req.body || {});
+      const resource = builder(req.body || {}, ig);
       const r = await fhirClient.post(`/${resourceType}`, resource, env);
 
       if (r.status >= 200 && r.status < 300) {
@@ -54,7 +57,8 @@ function createRoute(resourceType, builder) {
           resourceType,
           id: r.data.id,
           status: r.status,
-          env
+          env,
+          ig
         });
       } else {
         // 4xx/5xx：帶回 OperationOutcome 供前端顯示錯誤訊息
@@ -62,6 +66,7 @@ function createRoute(resourceType, builder) {
           resourceType,
           status: r.status,
           env,
+          ig,
           outcome: r.data
         });
       }
