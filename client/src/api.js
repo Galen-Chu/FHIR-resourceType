@@ -1,6 +1,6 @@
 // Express 中介 API 的 axios wrapper
 import axios from 'axios';
-import { currentEnv } from './store';
+import { currentEnv, currentIG } from './store';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || 'http://localhost:3000/api',
@@ -9,9 +9,10 @@ const api = axios.create({
   validateStatus: () => true
 });
 
-// 每個請求帶上目前選擇的 FHIR Server 環境
+// 每個請求帶上目前選擇的 FHIR Server 環境與 IG Profile 矩陣（兩個獨立維度）
 api.interceptors.request.use((req) => {
   req.headers['X-FHIR-Env'] = currentEnv.value;
+  req.headers['X-FHIR-IG'] = currentIG.value;
   return req;
 });
 

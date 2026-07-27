@@ -2,14 +2,15 @@
 // 核心欄位：identifier、name、gender、birthDate、address / telecom
 // 關鍵 reference：managingOrganization → Organization
 const { makeIdentifier, meta, reference, requireFields } = require('./common');
+const { toIsoDate } = require('./dateUtils');
 
-function buildPatient(input = {}) {
+function buildPatient(input = {}, ig) {
   requireFields(input, ['family', 'given', 'gender', 'birthDate', 'organizationId']);
   const { family, given } = input;
   const resource = {
     resourceType: 'Patient',
-    meta: meta('Patient'),
-    identifier: [makeIdentifier('patient', 'tw-pat')],
+    meta: meta('Patient', ig),
+    identifier: [makeIdentifier('patient', 'tw-pat', input.externalId)],
     active: true,
     name: [
       {
@@ -19,7 +20,7 @@ function buildPatient(input = {}) {
       }
     ],
     gender: input.gender,
-    birthDate: input.birthDate,
+    birthDate: toIsoDate(input.birthDate, 'birthDate'),
     managingOrganization: reference('Organization', input.organizationId)
   };
 

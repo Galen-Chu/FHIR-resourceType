@@ -44,9 +44,22 @@
       </select>
       <div class="hint">請先於「Organization」頁建立機構</div>
     </div>
-    <button class="primary" :disabled="loading || !canSubmit" @click="submit">
-      {{ loading ? '建立中…' : '送出建立' }}
-    </button>
+    <div class="form-row">
+      <label>externalId（選填，Upsert 用）</label>
+      <input v-model="form.externalId" placeholder="例如：病歷號 MRN-000123" />
+      <div class="hint">
+        帶入穩定的病歷號後可用「Upsert 送出」：同一個 externalId 重複送出會
+        更新既有病患資料，而非每次都建立新的
+      </div>
+    </div>
+    <div class="button-row">
+      <button class="primary" :disabled="loading || !canSubmit" @click="submit">
+        {{ loading ? '建立中…' : '送出建立' }}
+      </button>
+      <button class="ghost" :disabled="loading || !canSubmit || !form.externalId" @click="upsert">
+        {{ loading ? '處理中…' : 'Upsert 送出' }}
+      </button>
+    </div>
   </div>
 
   <JsonPreviewPanel endpoint="/patients" :payload="form" :disabled="!canSubmit" filename="patient" />
@@ -68,17 +81,18 @@ const form = reactive({
   birthDate: '1990-01-01',
   phone: '',
   address: '',
-  organizationId: ''
+  organizationId: '',
+  externalId: ''
 });
 const result = ref(null);
 const loading = ref(false);
 const canSubmit = computed(() => form.family && form.given && form.birthDate && form.organizationId);
 
-async function submit() {
+async function send(method) {
   loading.value = true;
   result.value = null;
   try {
-    const r = await api.post('/patients', { ...form });
+    const r = await api({ method, url: '/patients', data: { ...form } });
     result.value = r.data;
     if (r.data.id) {
       registerResource('Patient', r.data.id, `${form.family}${form.given}（Patient/${r.data.id}）`);
@@ -89,4 +103,7 @@ async function submit() {
     loading.value = false;
   }
 }
+
+const submit = () => send('post');
+const upsert = () => send('put');
 </script>

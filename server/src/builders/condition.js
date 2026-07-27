@@ -2,13 +2,14 @@
 // 核心欄位：code（ICD-10）、clinicalStatus、onsetDateTime
 // 關鍵 reference：subject → Patient、encounter → Encounter
 const { makeIdentifier, meta, reference, requireFields } = require('./common');
+const { toIsoDateTime } = require('./dateUtils');
 
-function buildCondition(input = {}) {
+function buildCondition(input = {}, ig) {
   requireFields(input, ['patientId', 'encounterId', 'icd10Code']);
   return {
     resourceType: 'Condition',
-    meta: meta('Condition'),
-    identifier: [makeIdentifier('condition', 'tw-cond')],
+    meta: meta('Condition', ig),
+    identifier: [makeIdentifier('condition', 'tw-cond', input.externalId)],
     clinicalStatus: {
       coding: [
         {
@@ -40,7 +41,7 @@ function buildCondition(input = {}) {
     },
     subject: reference('Patient', input.patientId),
     encounter: reference('Encounter', input.encounterId),
-    onsetDateTime: input.onsetDateTime || new Date().toISOString()
+    onsetDateTime: input.onsetDateTime ? toIsoDateTime(input.onsetDateTime, 'onsetDateTime') : new Date().toISOString()
   };
 }
 

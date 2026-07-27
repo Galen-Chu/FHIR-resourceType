@@ -5,6 +5,9 @@
 一次性建置七種 ResourceType，符合 **TW Core IG** 規範，可在
 **台灣 TW Core 測試站**與 **HAPI 國際公開站**之間自由切換寫入/查詢目標，
 並提供 JSON 規格預覽、驗證證據產出工具與 CDS Hooks 臨床決策支援端點。
+v4（現有 Node.js/Vue 技術棧內的寫入強健度擴充：Upsert、IG 矩陣、鑑權去重、
+ISO 8601 校準、監控台、CI/CD）**六項已全部完成**；異構資料清洗與 Python
+子系統合流規劃於 v5。詳見下方[擴充藍圖](#擴充藍圖v4--v5-規劃中)。
 
 | 項目 | 內容 |
 | --- | --- |
@@ -14,6 +17,41 @@
 | FHIR Server | 雙環境可切換：`twcore.hapi.fhir.tw/fhir`（預設）/ `hapi.fhir.org/baseR4`（FHIR R4） |
 | 臨床決策支援 | CDS Hooks（patient-view、order-select） |
 | 驗證 | JSON 規格預覽、`$validate` 批次驗證工具、結構化 Log 存證 |
+| 測試 | Jest（server 端）、Pytest（`monitor/`，v4 起導入） |
+| 監控 | Streamlit 即時數據池監控台（`monitor/`，選用、獨立唯讀，v4） |
+
+## 擴充藍圖（v4 / v5 規劃中）
+
+本專案定位為「醫療中介軟體（Middleware）」的完整實作佐證，v1–v3 涵蓋了
+資源建立、JSON 預覽、環境切換、驗證證據與 CDS Hooks；**v4 已全部完成**，
+補齊寫入強健度（Upsert、IG 矩陣、鑑權去重、ISO 8601 校準）與工程嚴謹度
+（Jest/Pytest 測試、CI、監控台、版本釋出控制）。當初依「是否會被 v5
+系統合流重做」拆為兩個階段，避免同一段清洗邏輯先用 JS 寫一次、合流時
+又用 Python 重寫一次：
+
+- **v4**（已完成）：在現有 Node.js/Vue 技術棧內完成，皆為 Express
+  Gateway／builder 層的邏輯，與未來是否合流無關，不會被推翻
+- **v5**（規劃中）：與 `FHIR-bioMedData`（Python 清洗引擎）合流時一併
+  實作，讓異構資料清洗直接以 Python 一次到位
+
+（🔴 核心賣點／🟠 高優先／🟡 中優先，狀態即時更新於下方版本演進紀錄）：
+
+### v4 — Node 端寫入強健度（現有技術棧內完成）
+
+| 優先級 | 項目 | 現況 | 說明 |
+| --- | --- | --- | --- |
+| 🔴 | Upsert 覆寫機制 | ✅ 已完成 | 新增 `PUT /api/{resource}`：以 FHIR conditional update 依穩定的 `externalId` 判斷已存在則更新、不存在則新增；同 externalId 的併發寫入以 per-key 序列化佇列防止 Race Condition |
+| 🟠 | IG Profile 切換矩陣 | ✅ 已完成 | `PROFILES` 改為 `IG_PROFILES` 矩陣（`tw-core` / `r4-base`），新增 `X-FHIR-IG` header 與既有 `X-FHIR-Env` 環境切換平行運作、可交叉組合；前端側邊欄新增 IG 選擇器 |
+| 🟠 | 鑑權與去重防禦 | ✅ 已完成 | 新增 Gateway 自身的 `X-Gateway-Key` 鑑權（選用）；上游 401/403 明確診斷 log；Upsert 遇到 412（identifier 對應多筆既有資源）轉譯為 `409` + 明確錯誤訊息 |
+| 🟡 | ISO 8601 時間格式校準層 | ✅ 已完成 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period`、`onsetDateTime`）統一格式驗證與校準，取代原本的直接透傳；手動曆法檢查攔截不存在的日期（如 2/30、非閏年 2/29），不依賴 `Date` 物件的寬鬆解析。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
+| 🟡 | CLI + Streamlit 即時監控台 | ✅ 已完成 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `server/logs/exchange.log` 即時視覺化建立數、環境分布、成功率、回應時間、CDS Hooks 觸發次數；僅唯讀觀測、不參與主資料流，是本 repo 首次引入 Pytest 之處，也是 v5 合流前驗證 Node + Python 於同一 repo 共存的暖身 |
+| 🟡 | CI/CD 與版本釋出控制 | ✅ 已完成 | GitHub Actions 三個平行 job（server Jest／client build／monitor Pytest）；`CHANGELOG.md`（Keep a Changelog）；server／client 版本號依語意化版本規則同步遞增至 `1.1.0`（v4 全部向下相容，故為 MINOR） |
+
+### v5 — 系統合流與異構資料清洗（規劃中）
+
+| 優先級 | 項目 | 現況 | 說明 |
+| --- | --- | --- | --- |
+| 🔴 | 異構資料清洗前置層 | 規劃中 | 與 `FHIR-bioMedData` 合流：移植其 Config Matrix（院所欄位對齊、性別字典、民國年轉換）為清洗前置層，新增 `POST /api/ingest/{resource}` 讀取 HIS/LIS 風格異構 CSV/JSON，正規化後呼叫既有 builder 產出 TW Core 資源；直接以 Python 實作，避免 v4 階段用 JS 重工 |
 
 ## 系統架構
 
@@ -49,19 +87,30 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 ├─ server/
 │  ├─ src/
 │  │  ├─ index.js               # Express 進入點（/api + /cds-services）
-│  │  ├─ config.js              # 雙環境 FHIR Server 清單、TW Core Profile URLs
-│  │  ├─ fhirClient.js          # axios wrapper：依環境路由、預留 auth header 擴充點
+│  │  ├─ config.js              # 雙環境 FHIR Server 清單、IG Profile 矩陣（v4）
+│  │  ├─ fhirClient.js          # axios wrapper：依環境路由、Upsert（v4）、預留 auth header 擴充點
+│  │  ├─ igResolver.js          # IG Profile 矩陣切換解析（v4）
 │  │  ├─ logger.js              # 結構化輸出：console + logs/exchange.log 存證
+│  │  ├─ middleware/
+│  │  │  └─ gatewayAuth.js      #   Gateway 自身鑑權（X-Gateway-Key，選用，v4）
+│  │  ├─ utils/
+│  │  │  └─ keyedQueue.js       #   per-identifier 序列化佇列，防 Upsert Race Condition（v4）
 │  │  ├─ builders/              # TW Core JSON 組裝 × 7
 │  │  │  ├─ common.js           #   identifier / meta / reference / 必填驗證共用工具
+│  │  │  ├─ dateUtils.js        #   ISO 8601 時間格式校準（v4）
 │  │  │  ├─ organization.js … medicationRequest.js
 │  │  ├─ routes/                # 7 資源 route + 2 查詢端點
-│  │  │  ├─ createRoute.js      #   共用工廠：建立 + preview + 400 OperationOutcome
+│  │  │  ├─ createRoute.js      #   共用工廠：建立 + Upsert（v4）+ preview + 400 OperationOutcome
 │  │  │  └─ organizations.js … medicationRequests.js
 │  │  └─ cds/                   # CDS Hooks
 │  │     ├─ index.js            #   discovery 與服務路由
 │  │     ├─ patientSummary.js   #   patient-view：摘要 + 生命徵象警示
 │  │     └─ medicationCheck.js  #   order-select：重複用藥檢查
+│  ├─ test/                     # Jest 單元測試（v4 起導入）
+│  │  ├─ dateUtils.test.js / builders.dateCalibration.test.js
+│  │  ├─ igMatrix.test.js
+│  │  ├─ keyedQueue.test.js / upsert.test.js
+│  │  └─ gatewayAuth.test.js / dedupe.test.js / fhirClientDiagnostics.test.js
 │  ├─ scripts/
 │  │  └─ validate-all.js        # 驗證證據產出工具（npm run validate）
 │  ├─ logs/exchange.log         # 交換存證 log（執行時自動產生，gitignore）
@@ -80,7 +129,13 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 │  │  ├─ api.js / router.js / App.vue / main.js / style.css
 │  ├─ .env.example
 │  └─ package.json
+├─ monitor/                     # CLI + Streamlit 即時監控台（v4，Python，獨立唯讀）
+│  ├─ parser.py                 #   exchange.log 逐行解析（純函式）
+│  ├─ dashboard.py              #   Streamlit 進入點
+│  ├─ tests/test_parser.py      #   Pytest（本 repo 首次引入）
+│  └─ requirements.txt
 ├─ docs/
+│  ├─ v4-design.md              # v4 六項技術設計草案
 │  └─ validation/               # 驗證證據：resources / reports / screenshots / logs
 └─ README.md
 ```
@@ -107,6 +162,16 @@ cp .env.example .env     # VITE_API_BASE=http://localhost:3000/api
 npm run dev
 ```
 
+### 3. 啟動監控台（選用，http://localhost:8501，v4）
+
+獨立唯讀工具，只讀後端寫出的 `server/logs/exchange.log`：
+
+```bash
+cd monitor
+pip install -r requirements.txt
+streamlit run dashboard.py
+```
+
 ## 建立順序 · 相依圖
 
 ```
@@ -126,7 +191,7 @@ npm run dev
 ## API 設計
 
 七種資源共用同一種端點模式：`POST /api/{resource}` 建立、內部轉呼叫 FHIR Server，
-回應整理成一致的 `{ id, status, resourceType, env }` 格式。
+回應整理成一致的 `{ id, status, resourceType, env, ig }` 格式。
 
 | 方法 | Express 端點 | 轉呼叫 |
 | --- | --- | --- |
@@ -137,16 +202,18 @@ npm run dev
 | POST | `/api/conditions` | `POST /Condition` |
 | POST | `/api/observations` | `POST /Observation` |
 | POST | `/api/medication-requests` | `POST /MedicationRequest` |
+| PUT | `/api/{resource}`（同上 7 種） | `PUT /{resourceType}?identifier=...`（Upsert，v4） |
 | POST | `/api/{resource}/preview` | —（僅組裝 JSON，不呼叫 FHIR Server） |
 | GET | `/api/organizations/:id/patients` | `GET /Patient?organization={id}` |
 | GET | `/api/patients/:id` | `GET /Patient/{id}` |
 | GET | `/api/config/fhir-servers` | —（環境清單，供前端選擇器） |
+| GET | `/api/config/fhir-igs` | —（IG 清單，供前端選擇器，v4） |
 | GET | `/api/health` | —（服務狀態與環境設定） |
 
 成功回應範例（回傳給前端）：
 
 ```json
-{ "resourceType": "Encounter", "id": "tw-enc-5510", "status": 201, "env": "twcore" }
+{ "resourceType": "Encounter", "id": "tw-enc-5510", "status": 201, "env": "twcore", "ig": "tw-core" }
 ```
 
 錯誤處理：
@@ -154,6 +221,21 @@ npm run dev
 - **缺必填欄位**：不以預設值靜默補齊，回 `400` 並附 FHIR `OperationOutcome`
   （`issue[0].details.text` 列出缺漏欄位），與聯測實況一致
 - **FHIR Server 回 4xx/5xx**：原樣附上 `OperationOutcome`，前端紅色卡片顯示錯誤訊息
+
+### Upsert（v4）
+
+`PUT /api/{resource}` 需在 body 帶入穩定的 `externalId`（病歷號、機構代碼
+等業務識別碼）：
+
+```json
+{ "name": "仁愛醫院", "externalId": "HOSP-A" }
+```
+
+依 `externalId` 判斷 FHIR Server 上是否已有對應資源：不存在則新增
+（`201`，`outcome: "created"`）、已存在則更新（`200`，`outcome: "updated"`）。
+未帶 `externalId` 時回 `400`（Upsert 語意需要穩定識別碼，否則每次都會
+被視為新資源）。同一個 `externalId` 的併發請求會在 Gateway 端序列化執行，
+不同 `externalId` 之間互不阻塞。
 
 ### JSON 規格預覽（Validator 手動驗證）
 
@@ -227,6 +309,37 @@ info / warning / critical 卡片。環境依 `X-FHIR-Env` header 決定
 - **回應後**：HTTP status、resource id 或錯誤訊息、耗時 (ms)
 - **實作**：`morgan` 記錄 HTTP 存取層；自訂 `logger.js` 記錄 FHIR 交換細節與檔案存證
 
+## 測試
+
+server 端單元測試（Jest，v4 起導入，共 53 個測試案例）：
+
+```bash
+cd server
+npm test
+```
+
+涵蓋範圍：ISO 8601 校準（含手動曆法檢查邊界情境）、IG Profile 矩陣、
+Upsert + Race Condition 防禦、Gateway 鑑權、412→409 去重轉譯、
+`fhirClient` 診斷 log。
+
+`monitor/` 的 log 解析測試（Pytest，共 16 個測試案例）：
+
+```bash
+cd monitor
+pip install -r requirements.txt
+pytest -v
+```
+
+### CI（GitHub Actions，v4）
+
+`.github/workflows/ci.yml` 在每次 push / PR 時平行執行三個 job：
+server（`npm test`）、client（`npm run build`）、monitor（`pytest`）。
+`npm run validate` 因需要對外呼叫真實 FHIR Server 且非冪等，故意不放進
+CI，維持手動執行、證據存進 `docs/validation/` 的既有作法。
+
+版本歷程見 [CHANGELOG.md](CHANGELOG.md)（遵循 Keep a Changelog 格式，
+聚焦「哪個版本改了什麼」；「為什麼這樣設計」見下方版本演進紀錄）。
+
 ## 驗證證據（docs/validation/）
 
 `server` 內建驗證證據產出工具：
@@ -266,6 +379,8 @@ npm run validate -- --env all     # 對兩個環境都驗證
    直接引用 Practitioner。
 3. **驗證機制** — HAPI 測試站暫不需要 API Key／Bearer Token；`fhirClient.js` 已預留
    auth header 擴充點（設定 `FHIR_AUTH_TOKEN` 環境變數即自動帶入）。
+   Gateway 自身的鑑權（`GATEWAY_API_KEY` / `X-Gateway-Key`）為獨立機制，
+   保護的是 Express `/api` 端點本身，見版本演進紀錄 v4.4 節。
 4. **資源範圍** — 不分階段，一次建置七種 ResourceType。
 
 ## 版本演進紀錄
@@ -295,3 +410,151 @@ npm run validate -- --env all     # 對兩個環境都驗證
 | 3 | 建議 2 | 交換 Log 同步寫入 `logs/exchange.log`，每行標記目標環境 |
 | 4 | 建議 1 | `npm run validate`：批次產出資源 JSON 與 `$validate` 報告至 `docs/validation/` |
 | 5 | 建議 3 | CDS Hooks：discovery + patient-summary（生命徵象警示）+ medication-duplicate-check（重複用藥） |
+
+### v4 — 寫入強健度擴充（規劃中，現有技術棧內完成）
+
+聚焦「醫療中介軟體」尚未覆蓋的寫入強健度：防禦併發寫入造成的髒資料、
+標準規格深度、觀測工具。皆為 Express Gateway／builder 層邏輯，與 v5 是否
+合流無關。項目與優先級詳見上方[擴充藍圖](#擴充藍圖v4--v5-規劃中)，開發順序：
+
+1. ✅ Upsert 覆寫機制 + 併發序列化寫入
+2. ✅ IG Profile 切換矩陣
+3. ✅ 鑑權與去重防禦
+4. ✅ ISO 8601 時間格式校準層（結構化輸入部分）
+5. ✅ CLI + Streamlit 即時監控台
+6. ✅ CI/CD 與版本釋出控制
+
+**v4 六項全部完成**，累計新增 69 個測試案例（server 53 個 Jest + monitor
+16 個 Pytest），server／client 版本號同步遞增至 `1.1.0`。
+
+#### v4.6 — CI/CD 與版本釋出控制（已完成）
+
+- 新增 `.github/workflows/ci.yml`：push / PR 時平行執行三個 job
+  - `server`：`npm ci` + `npm test`（Jest，53 個測試）
+  - `client`：`npm ci` + `npm run build`（確保 Vue 專案打包不壞）
+  - `monitor`：`pip install -r requirements.txt` + `pytest`（16 個測試）
+  - `npm run validate` 需要對外呼叫真實 twcore / hapi.fhir.org 且非
+    冪等（會實際寫入測試站），故意不放進 CI，維持手動執行的既有作法
+- 新增根目錄 `CHANGELOG.md`（Keep a Changelog 格式），補上 v1.0.0
+  （v1–v3）與 v1.1.0（v4）的條目，與本節「版本演進紀錄」互相對照但
+  服務不同讀者（README 講「為什麼」、CHANGELOG 講「哪個版本改了什麼」）
+- `server/package.json`、`client/package.json` 版本號從 `1.0.0` 遞增至
+  `1.1.0`：v4 六項全部是向下相容的新增功能（新端點、新選填欄位、新
+  header），未變更既有 API 行為，依語意化版本規則屬 MINOR 而非 MAJOR
+- 三個 job 的指令都在本機實際執行過一次（`npm ci` 而非 `npm install`，
+  更貼近 CI 實際行為）確認會成功，同時順手跑了 `npm audit fix`
+  清掉可安全修復的漏洞（body-parser）；剩餘的高風險項目全部是 jest/vite
+  開發工具鏈本身的間接依賴，修復需要降版本（breaking change），評估後
+  不值得為了清乾淨 audit 報告犧牲工具鏈穩定性，保留現狀
+
+#### v4.5 — CLI + Streamlit 即時監控台（已完成）
+
+獨立唯讀輔助工具，只讀 `server/logs/exchange.log`，不呼叫任何 API、不參與
+主資料流，維持核心系統 Node.js/Vue 技術棧的單一性：
+
+- `monitor/parser.py`：log 逐行解析（純函式，與畫面渲染分離，方便獨立
+  測試），辨識三種事件：request（`→`）、response（`←`）、CDS Hook
+  觸發（`⚕`，新增的可辨識標記）
+  - 手動曆法檢查等級的細節：解析時沒有依賴 Python 內建日期解析（避免
+    重蹈 v4.1 遇到的 `Date` 寬鬆解析問題），純粹用 regex 拆欄位
+- `server/src/cds/index.js` 補上兩行 `logger.info` 標記 CDS Hook 觸發
+  事件——原本底層查詢已由 `fhirClient` 自動記錄一般 GET request/response，
+  但無法單從那兩行辨識「這是 CDS Hook 觸發的」，所以額外標記
+- `monitor/dashboard.py`：Streamlit 進入點，畫面含累積請求數、成功率、
+  平均回應時間、CDS Hooks 觸發次數、依環境分布長條圖、成功/失敗比例、
+  回應時間趨勢、即時 log 串流表格（最新在上）；每 5 秒自動重新整理
+- 16 個 Pytest 測試案例，以真實跑過的 `exchange.log` 內容（含 URL
+  編碼的 query string、sandbox proxy 攔截時的空 detail 欄位等真實邊界
+  情境）驗證 parser 正確性——本 repo 首次引入 Pytest
+- 實際起 `streamlit run` + Playwright 截圖驗證：畫面正確渲染、無
+  Python 例外；並實際觸發一次 CDS Hook 呼叫，確認「累積請求數」與
+  「CDS Hooks 觸發次數」統計在自動重新整理後正確更新（3→7、0→1）
+
+#### v4.4 — 鑑權與去重防禦（已完成）
+
+呼應自傳「近期我成功解決外部廠商數據冗餘與 URL 鑑權排查」的實戰場景，
+分三個子設計：
+
+- **Gateway 自身鑑權**：新增 `server/src/middleware/gatewayAuth.js`，
+  未設定 `GATEWAY_API_KEY` 時完全不啟用（維持既有免鑑權行為）；設定後
+  每個 `/api` 請求需帶對應的 `X-Gateway-Key` header，否則回 `401`。
+  `/cds-services` 不受影響（規格上是給臨床系統即時呼叫，鑑權機制不同）
+- **上游鑑權失敗診斷**：`fhirClient.js` 統一在收到 401/403 時多記一行
+  結構化 log（含排查提示：檢查 Token 是否過期，或該環境是否需要鑑權），
+  不改變回應內容——前端仍照現有邏輯顯示 OperationOutcome
+- **去重防禦**：Upsert 遇到 identifier 對應多筆既有資源時，HAPI 回
+  `412`；Gateway 攔截並轉譯為更明確的 `409` + `OperationOutcome`
+  （`code: duplicate`，訊息點名是哪個 externalId 疑似重複），取代原本
+  單純透傳 412 的行為。同時在 log 記錄去重診斷（含完整 identifier）
+- 新增 12 個 Jest 測試案例（共 53 個）：Gateway 鑑權的放行/攔截情境、
+  412→409 轉譯（含確認 POST 路徑與其他狀態碼不受影響）、`fhirClient`
+  診斷 log 的觸發條件；實際起 server 驗證 Gateway 鑑權三種情境
+  （未設定 / 缺 header / 錯誤 header / 正確 header）
+
+#### v4.3 — Upsert 覆寫機制 + Race Condition 防禦（已完成）
+
+- 新增 `PUT /api/{resource}`：以 FHIR **conditional update**
+  （`PUT /{resourceType}?identifier=system|value`）實作 Upsert——HAPI
+  依 identifier 搜尋後自己判斷新增（0 筆 → 201）或更新（1 筆 → 200），
+  搜尋與寫入在 Server 端是原子操作，比 Gateway 自己刻「先查後寫」更可靠
+- `makeIdentifier()` 新增選填的 `externalId` 參數：呼叫端提供穩定的業務
+  識別碼（病歷號、機構代碼等）時，同一個 `externalId` 重複送出會被視為
+  同一筆資源；未帶時維持原本隨機產生的行為，既有 7 個建立表單
+  （`POST` 路徑）完全不受影響
+  - `PUT` 端點明確要求 `externalId`：沒有穩定識別碼時 Upsert 語意沒有
+    意義（每次都會被當成新資源），此情境回 `400`
+- 新增 `server/src/utils/keyedQueue.js`（`withKeyLock`）：per-identifier
+  序列化佇列，防止同一個 externalId 的併發請求在 Gateway 端交錯執行；
+  不同 externalId 完全平行、互不阻塞
+- 新增 26 個 Jest 測試案例（共 41 個），以 `supertest` + mock `fhirClient`
+  驗證路由邏輯，含明確的併發情境測試（同 key 依序執行、不同 key 平行、
+  前一個任務失敗不卡住佇列），跑 3 輪確認無 flaky
+- **已知限制**：這個 session 的沙箱環境對外連線被 proxy 擋掉，無法對
+  真正的 HAPI 測試站（twcore / hapi-org）做即時 round-trip 驗證；已用
+  mock 驗證過 Gateway 端邏輯，實際對外行為建議在有網路的環境手動跑一次
+  `PUT /api/organizations` 確認
+
+#### v4.2 — IG Profile 切換矩陣（已完成）
+
+- `config.js` 的 `PROFILES`（單組 TW Core URL）改為 `IG_PROFILES` 矩陣：
+  `tw-core`（既有 7 種 TW Core Profile）與 `r4-base`（不掛任何自訂
+  Profile，對應 hapi.fhir.org 未載入 TW Core 驗證規則的現況）
+- 新增 `server/src/igResolver.js`（`resolveIG`），與 `fhirClient.resolveEnv`
+  平行：`X-FHIR-Env` 決定寫去哪個 Server、`X-FHIR-IG` 決定用哪組 Profile
+  組裝資源，兩者是獨立維度，可交叉組合
+- 7 個 builder 的 `meta(resourceType)` 改為 `meta(resourceType, ig)`；
+  未帶 `ig` 時退回 `DEFAULT_IG`，向下相容既有呼叫方式（`scripts/validate-all.js`
+  等既有呼叫點不受影響）
+- 新增 `GET /api/config/fhir-igs`，前端側邊欄新增 IG 選擇器（與環境選擇器
+  並列），選擇結果存 localStorage、隨每個請求以 `X-FHIR-IG` header 帶入
+- 9 個 Jest 測試案例 + Playwright 瀏覽器端到端驗證（切換選單 →
+  header 隨之改變 → 預覽 JSON 正確帶/不帶 `meta.profile`）
+
+#### v4.1 — ISO 8601 時間格式校準層（已完成）
+
+- 新增 `server/src/builders/dateUtils.js`：`toIsoDate` / `toIsoDateTime`，
+  手動曆法檢查（月份天數、閏年 2/29）攔截不存在的日期（如 2/30、非閏年
+  2/29），不依賴 `Date` 物件的寬鬆解析——`new Date('2024-02-30')` 會被
+  靜默捲動成 `2024-03-01` 而非回傳 Invalid Date，若只用
+  `Number.isNaN(new Date(v).getTime())` 判斷會漏掉這類不存在日期
+- 套用於 `patient.js`（`birthDate`）、`encounter.js`（`period.start/end`）、
+  `condition.js`（`onsetDateTime`）；僅處理已結構化輸入，原始異質格式
+  （如民國年）的轉換留給 v5 清洗層
+- 順手修正 `ValidationError` / `createRoute.js`：新增 FHIR `IssueType`
+  區分 `required`（缺欄位）與 `value`（格式不合法），避免格式錯誤被
+  誤標成「缺少必填欄位」
+- 本 repo 首次導入 Jest（`server/package.json` 新增 `npm test`），
+  21 個測試案例涵蓋日期校準的邊界情境與 builder 整合
+
+### v5 — 系統合流與異構資料清洗（規劃中）
+
+與 `FHIR-bioMedData`（Python 清洗引擎）合流，補上「接收異構外部資料源」
+這塊能力，讓專案完整涵蓋「異構清洗 → API 網關 → FHIR 標準化落庫」的
+端到端流程：
+
+1. 移植 Config Matrix（院所欄位對齊、性別字典、民國年轉換）為 Python
+   清洗前置層
+2. 新增 `POST /api/ingest/{resource}`：清洗結果串接既有 v1–v4 builder /
+   Upsert / IG 矩陣邏輯，不重複實作寫入層
+
+各項目完成後會更新對應狀態欄位（規劃中 → 已完成）並移至上方版本表中。

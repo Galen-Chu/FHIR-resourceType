@@ -1,13 +1,14 @@
 {
   "name": "fhir-exchange-test-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "FHIR 交換測試系統 - Express 中介 API（TW Core IG，七大 ResourceType）",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "validate": "node scripts/validate-all.js"
+    "validate": "node scripts/validate-all.js",
+    "test": "jest"
   },
   "dependencies": {
     "axios": "^1.7.0",
@@ -17,6 +18,8 @@
     "morgan": "^1.10.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.0",
+    "supertest": "^7.0.0"
   }
 }

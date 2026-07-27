@@ -10,6 +10,13 @@
       <div class="env-url">{{ currentUrl }}</div>
     </div>
 
+    <div class="group-title">IG Profile 矩陣</div>
+    <div class="env-select">
+      <select v-model="currentIG">
+        <option v-for="g in igs" :key="g.key" :value="g.key">{{ g.label }}</option>
+      </select>
+    </div>
+
     <div class="group-title">建立資源</div>
     <router-link to="/organizations/create">Organization</router-link>
     <router-link to="/practitioners/create">Practitioner</router-link>
@@ -35,12 +42,18 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import api from './api';
-import { currentEnv } from './store';
+import { currentEnv, currentIG } from './store';
 
 // 靜態預設值，開機後以後端 /api/config/fhir-servers 的清單覆蓋
 const servers = ref([
   { key: 'twcore', label: '台灣 TW Core 測試站', url: 'https://twcore.hapi.fhir.tw/fhir' },
   { key: 'hapi-org', label: 'HAPI 國際公開站（R4）', url: 'https://hapi.fhir.org/baseR4' }
+]);
+
+// 靜態預設值，開機後以後端 /api/config/fhir-igs 的清單覆蓋
+const igs = ref([
+  { key: 'tw-core', label: 'TW Core IG' },
+  { key: 'r4-base', label: 'FHIR R4 Base（無自訂 Profile）' }
 ]);
 
 const currentUrl = computed(
@@ -52,6 +65,14 @@ onMounted(async () => {
     const r = await api.get('/config/fhir-servers');
     if (r.status === 200 && Array.isArray(r.data.servers)) {
       servers.value = r.data.servers;
+    }
+  } catch {
+    // 後端未啟動時維持靜態清單
+  }
+  try {
+    const r = await api.get('/config/fhir-igs');
+    if (r.status === 200 && Array.isArray(r.data.igs)) {
+      igs.value = r.data.igs;
     }
   } catch {
     // 後端未啟動時維持靜態清單
