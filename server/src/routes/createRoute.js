@@ -1,9 +1,12 @@
 // 七種資源共用的建立端點模式：
 // POST /api/{resource} → builder 組裝 TW Core JSON → 轉呼叫 HAPI FHIR
 // → 回應整理成一致的 { id, status, resourceType } 格式
+// PUT  /api/{resource} → Upsert（conditional update）：依 externalId 判斷
+// 已存在則更新、不存在則新增；同 externalId 的併發寫入序列化，防止 Race Condition
 const express = require('express');
 const fhirClient = require('../fhirClient');
 const { resolveIG } = require('../igResolver');
+const { withKeyLock } = require('../utils/keyedQueue');
 const logger = require('../logger');
 const { ValidationError } = require('../builders/common');
 
@@ -23,6 +26,49 @@ function validationOutcome(err) {
       }
     ]
   };
+}
+
+// POST 與 PUT 共用的組裝 + 呼叫 FHIR Server + 回應整理邏輯，
+// 差異只在 callFhir（POST 建立 vs. PUT Upsert）與是否附加 outcome 欄位
+async function submitResource(req, res, resourceType, builder, callFhir, extraFields) {
+  const env = fhirClient.resolveEnv(req.get('X-FHIR-Env'));
+  const ig = resolveIG(req.get('X-FHIR-IG'));
+  try {
+    const resource = builder(req.body || {}, ig);
+    const r = await callFhir(resource, env);
+
+    if (r.status >= 200 && r.status < 300) {
+      res.status(r.status).json({
+        resourceType,
+        id: r.data.id,
+        status: r.status,
+        env,
+        ig,
+        ...(extraFields ? extraFields(r) : {})
+      });
+    } else {
+      // 4xx/5xx：帶回 OperationOutcome 供前端顯示錯誤訊息
+      res.status(r.status).json({
+        resourceType,
+        status: r.status,
+        env,
+        ig,
+        outcome: r.data
+      });
+    }
+  } catch (err) {
+    if (err instanceof ValidationError) {
+      logger.error(`${req.method} /${resourceType} 欄位驗證失敗`, { missing: err.missing });
+      res.status(400).json({ resourceType, status: 400, outcome: validationOutcome(err) });
+      return;
+    }
+    logger.error(`${req.method} /${resourceType} failed`, { message: err.message });
+    res.status(502).json({
+      resourceType,
+      status: 502,
+      error: `FHIR Server 呼叫失敗：${err.message}`
+    });
+  }
 }
 
 function createRoute(resourceType, builder) {
@@ -45,44 +91,34 @@ function createRoute(resourceType, builder) {
     }
   });
 
-  router.post('/', async (req, res) => {
-    const env = fhirClient.resolveEnv(req.get('X-FHIR-Env'));
-    const ig = resolveIG(req.get('X-FHIR-IG'));
-    try {
-      const resource = builder(req.body || {}, ig);
-      const r = await fhirClient.post(`/${resourceType}`, resource, env);
+  router.post('/', (req, res) =>
+    submitResource(req, res, resourceType, builder, (resource, env) =>
+      fhirClient.post(`/${resourceType}`, resource, env)
+    )
+  );
 
-      if (r.status >= 200 && r.status < 300) {
-        res.status(r.status).json({
-          resourceType,
-          id: r.data.id,
-          status: r.status,
-          env,
-          ig
-        });
-      } else {
-        // 4xx/5xx：帶回 OperationOutcome 供前端顯示錯誤訊息
-        res.status(r.status).json({
-          resourceType,
-          status: r.status,
-          env,
-          ig,
-          outcome: r.data
-        });
-      }
-    } catch (err) {
-      if (err instanceof ValidationError) {
-        logger.error(`POST /${resourceType} 必填欄位檢查失敗`, { missing: err.missing });
-        res.status(400).json({ resourceType, status: 400, outcome: validationOutcome(err) });
-        return;
-      }
-      logger.error(`POST /${resourceType} failed`, { message: err.message });
-      res.status(502).json({
-        resourceType,
-        status: 502,
-        error: `FHIR Server 呼叫失敗：${err.message}`
+  // Upsert：需要呼叫端提供穩定的 externalId（病歷號、機構代碼等），
+  // 否則每次都會被視為新資源、PUT 語意就沒有意義
+  router.put('/', async (req, res) => {
+    const externalId = req.body && req.body.externalId;
+    if (!externalId) {
+      const err = new ValidationError(['externalId'], {
+        message: 'Upsert 需要提供穩定的 externalId（病歷號／機構代碼等），否則每次都會被視為新資源'
       });
+      res.status(400).json({ resourceType, status: 400, outcome: validationOutcome(err) });
+      return;
     }
+
+    await withKeyLock(`${resourceType}:${externalId}`, () =>
+      submitResource(
+        req,
+        res,
+        resourceType,
+        builder,
+        (resource, env) => fhirClient.upsert(resourceType, resource, resource.identifier[0], env),
+        (r) => ({ outcome: r.status === 201 ? 'created' : 'updated' })
+      )
+    );
   });
 
   return router;

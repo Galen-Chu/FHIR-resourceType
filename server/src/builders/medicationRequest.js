@@ -8,7 +8,7 @@ function buildMedicationRequest(input = {}, ig) {
   return {
     resourceType: 'MedicationRequest',
     meta: meta('MedicationRequest', ig),
-    identifier: [makeIdentifier('medication-request', 'tw-medrq')],
+    identifier: [makeIdentifier('medication-request', 'tw-medrq', input.externalId)],
     status: input.status || 'active',
     intent: 'order',
     medicationCodeableConcept: {

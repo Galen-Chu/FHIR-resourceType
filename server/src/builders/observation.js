@@ -8,7 +8,7 @@ function buildObservation(input = {}, ig) {
   return {
     resourceType: 'Observation',
     meta: meta('Observation', ig),
-    identifier: [makeIdentifier('observation', 'tw-obs')],
+    identifier: [makeIdentifier('observation', 'tw-obs', input.externalId)],
     status: input.status || 'final',
     category: [
       {

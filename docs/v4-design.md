@@ -9,7 +9,17 @@ builder / route 工廠 / fhirClient 單一出口的既有分層不變。
 
 ---
 
-## 1. Upsert 覆寫機制 + Race Condition 防禦
+## 1. Upsert 覆寫機制 + Race Condition 防禦 ✅ 已完成
+
+> 實作與設計稿一致。唯一補充：`PUT` 端點明確要求 `externalId`（設計稿
+> 有提到「conditional update 需要穩定 identifier 才有意義」，但沒明講
+> 遇到未帶的情況要怎麼處理）——實作時補上：未帶 `externalId` 直接回
+> `400`，避免呼叫端誤用 PUT 卻拿到一個其實每次都在 create 新資源、
+> 完全沒有 Upsert 效果的端點。
+>
+> 已知限制：此開發環境的沙箱網路對外被擋，無法對真正的 HAPI 測試站做
+> live round-trip 驗證，僅以 mock `fhirClient` 的 Jest 測試驗證
+> Gateway 端邏輯（identifier 組裝、序列化佇列、狀態碼轉譯）。
 
 ### 現況問題
 

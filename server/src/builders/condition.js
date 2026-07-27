@@ -9,7 +9,7 @@ function buildCondition(input = {}, ig) {
   return {
     resourceType: 'Condition',
     meta: meta('Condition', ig),
-    identifier: [makeIdentifier('condition', 'tw-cond')],
+    identifier: [makeIdentifier('condition', 'tw-cond', input.externalId)],
     clinicalStatus: {
       coding: [
         {

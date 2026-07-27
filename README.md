@@ -36,7 +36,7 @@ v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、I
 
 | 優先級 | 項目 | 現況 | 說明 |
 | --- | --- | --- | --- |
-| 🔴 | Upsert 覆寫機制 | 規劃中 | 依 `identifier` 判斷資源已存在則更新、不存在則新增；同 identifier 的併發寫入以序列化佇列防止 Race Condition |
+| 🔴 | Upsert 覆寫機制 | ✅ 已完成 | 新增 `PUT /api/{resource}`：以 FHIR conditional update 依穩定的 `externalId` 判斷已存在則更新、不存在則新增；同 externalId 的併發寫入以 per-key 序列化佇列防止 Race Condition |
 | 🟠 | IG Profile 切換矩陣 | ✅ 已完成 | `PROFILES` 改為 `IG_PROFILES` 矩陣（`tw-core` / `r4-base`），新增 `X-FHIR-IG` header 與既有 `X-FHIR-Env` 環境切換平行運作、可交叉組合；前端側邊欄新增 IG 選擇器 |
 | 🟠 | 鑑權與去重防禦 | 規劃中 | 落實 `FHIR_AUTH_TOKEN` Bearer Token 流程；寫入前依 identifier 做去重檢查，防止外部來源重複資料落庫 |
 | 🟡 | ISO 8601 時間格式校準層 | ✅ 已完成 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period`、`onsetDateTime`）統一格式驗證與校準，取代原本的直接透傳；手動曆法檢查攔截不存在的日期（如 2/30、非閏年 2/29），不依賴 `Date` 物件的寬鬆解析。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
@@ -83,23 +83,27 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 ├─ server/
 │  ├─ src/
 │  │  ├─ index.js               # Express 進入點（/api + /cds-services）
-│  │  ├─ config.js              # 雙環境 FHIR Server 清單、TW Core Profile URLs
-│  │  ├─ fhirClient.js          # axios wrapper：依環境路由、預留 auth header 擴充點
+│  │  ├─ config.js              # 雙環境 FHIR Server 清單、IG Profile 矩陣（v4）
+│  │  ├─ fhirClient.js          # axios wrapper：依環境路由、Upsert（v4）、預留 auth header 擴充點
+│  │  ├─ igResolver.js          # IG Profile 矩陣切換解析（v4）
 │  │  ├─ logger.js              # 結構化輸出：console + logs/exchange.log 存證
+│  │  ├─ utils/
+│  │  │  └─ keyedQueue.js       #   per-identifier 序列化佇列，防 Upsert Race Condition（v4）
 │  │  ├─ builders/              # TW Core JSON 組裝 × 7
 │  │  │  ├─ common.js           #   identifier / meta / reference / 必填驗證共用工具
 │  │  │  ├─ dateUtils.js        #   ISO 8601 時間格式校準（v4）
 │  │  │  ├─ organization.js … medicationRequest.js
 │  │  ├─ routes/                # 7 資源 route + 2 查詢端點
-│  │  │  ├─ createRoute.js      #   共用工廠：建立 + preview + 400 OperationOutcome
+│  │  │  ├─ createRoute.js      #   共用工廠：建立 + Upsert（v4）+ preview + 400 OperationOutcome
 │  │  │  └─ organizations.js … medicationRequests.js
 │  │  └─ cds/                   # CDS Hooks
 │  │     ├─ index.js            #   discovery 與服務路由
 │  │     ├─ patientSummary.js   #   patient-view：摘要 + 生命徵象警示
 │  │     └─ medicationCheck.js  #   order-select：重複用藥檢查
 │  ├─ test/                     # Jest 單元測試（v4 起導入）
-│  │  ├─ dateUtils.test.js
-│  │  └─ builders.dateCalibration.test.js
+│  │  ├─ dateUtils.test.js / builders.dateCalibration.test.js
+│  │  ├─ igMatrix.test.js
+│  │  └─ keyedQueue.test.js / upsert.test.js
 │  ├─ scripts/
 │  │  └─ validate-all.js        # 驗證證據產出工具（npm run validate）
 │  ├─ logs/exchange.log         # 交換存證 log（執行時自動產生，gitignore）
@@ -165,7 +169,7 @@ npm run dev
 ## API 設計
 
 七種資源共用同一種端點模式：`POST /api/{resource}` 建立、內部轉呼叫 FHIR Server，
-回應整理成一致的 `{ id, status, resourceType, env }` 格式。
+回應整理成一致的 `{ id, status, resourceType, env, ig }` 格式。
 
 | 方法 | Express 端點 | 轉呼叫 |
 | --- | --- | --- |
@@ -176,16 +180,18 @@ npm run dev
 | POST | `/api/conditions` | `POST /Condition` |
 | POST | `/api/observations` | `POST /Observation` |
 | POST | `/api/medication-requests` | `POST /MedicationRequest` |
+| PUT | `/api/{resource}`（同上 7 種） | `PUT /{resourceType}?identifier=...`（Upsert，v4） |
 | POST | `/api/{resource}/preview` | —（僅組裝 JSON，不呼叫 FHIR Server） |
 | GET | `/api/organizations/:id/patients` | `GET /Patient?organization={id}` |
 | GET | `/api/patients/:id` | `GET /Patient/{id}` |
 | GET | `/api/config/fhir-servers` | —（環境清單，供前端選擇器） |
+| GET | `/api/config/fhir-igs` | —（IG 清單，供前端選擇器，v4） |
 | GET | `/api/health` | —（服務狀態與環境設定） |
 
 成功回應範例（回傳給前端）：
 
 ```json
-{ "resourceType": "Encounter", "id": "tw-enc-5510", "status": 201, "env": "twcore" }
+{ "resourceType": "Encounter", "id": "tw-enc-5510", "status": 201, "env": "twcore", "ig": "tw-core" }
 ```
 
 錯誤處理：
@@ -193,6 +199,21 @@ npm run dev
 - **缺必填欄位**：不以預設值靜默補齊，回 `400` 並附 FHIR `OperationOutcome`
   （`issue[0].details.text` 列出缺漏欄位），與聯測實況一致
 - **FHIR Server 回 4xx/5xx**：原樣附上 `OperationOutcome`，前端紅色卡片顯示錯誤訊息
+
+### Upsert（v4）
+
+`PUT /api/{resource}` 需在 body 帶入穩定的 `externalId`（病歷號、機構代碼
+等業務識別碼）：
+
+```json
+{ "name": "仁愛醫院", "externalId": "HOSP-A" }
+```
+
+依 `externalId` 判斷 FHIR Server 上是否已有對應資源：不存在則新增
+（`201`，`outcome: "created"`）、已存在則更新（`200`，`outcome: "updated"`）。
+未帶 `externalId` 時回 `400`（Upsert 語意需要穩定識別碼，否則每次都會
+被視為新資源）。同一個 `externalId` 的併發請求會在 Gateway 端序列化執行，
+不同 `externalId` 之間互不阻塞。
 
 ### JSON 規格預覽（Validator 手動驗證）
 
@@ -353,12 +374,35 @@ npm run validate -- --env all     # 對兩個環境都驗證
 標準規格深度、觀測工具。皆為 Express Gateway／builder 層邏輯，與 v5 是否
 合流無關。項目與優先級詳見上方[擴充藍圖](#擴充藍圖v4--v5-規劃中)，開發順序：
 
-1. Upsert 覆寫機制 + 併發序列化寫入
+1. ✅ Upsert 覆寫機制 + 併發序列化寫入
 2. ✅ IG Profile 切換矩陣
 3. 鑑權與去重防禦
 4. ✅ ISO 8601 時間格式校準層（結構化輸入部分）
 5. CLI + Streamlit 即時監控台
 6. CI/CD 與版本釋出控制
+
+#### v4.3 — Upsert 覆寫機制 + Race Condition 防禦（已完成）
+
+- 新增 `PUT /api/{resource}`：以 FHIR **conditional update**
+  （`PUT /{resourceType}?identifier=system|value`）實作 Upsert——HAPI
+  依 identifier 搜尋後自己判斷新增（0 筆 → 201）或更新（1 筆 → 200），
+  搜尋與寫入在 Server 端是原子操作，比 Gateway 自己刻「先查後寫」更可靠
+- `makeIdentifier()` 新增選填的 `externalId` 參數：呼叫端提供穩定的業務
+  識別碼（病歷號、機構代碼等）時，同一個 `externalId` 重複送出會被視為
+  同一筆資源；未帶時維持原本隨機產生的行為，既有 7 個建立表單
+  （`POST` 路徑）完全不受影響
+  - `PUT` 端點明確要求 `externalId`：沒有穩定識別碼時 Upsert 語意沒有
+    意義（每次都會被當成新資源），此情境回 `400`
+- 新增 `server/src/utils/keyedQueue.js`（`withKeyLock`）：per-identifier
+  序列化佇列，防止同一個 externalId 的併發請求在 Gateway 端交錯執行；
+  不同 externalId 完全平行、互不阻塞
+- 新增 26 個 Jest 測試案例（共 41 個），以 `supertest` + mock `fhirClient`
+  驗證路由邏輯，含明確的併發情境測試（同 key 依序執行、不同 key 平行、
+  前一個任務失敗不卡住佇列），跑 3 輪確認無 flaky
+- **已知限制**：這個 session 的沙箱環境對外連線被 proxy 擋掉，無法對
+  真正的 HAPI 測試站（twcore / hapi-org）做即時 round-trip 驗證；已用
+  mock 驗證過 Gateway 端邏輯，實際對外行為建議在有網路的環境手動跑一次
+  `PUT /api/organizations` 確認
 
 #### v4.2 — IG Profile 切換矩陣（已完成）
 

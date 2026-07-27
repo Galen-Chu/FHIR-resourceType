@@ -22,9 +22,22 @@
         <option value="unknown">unknown</option>
       </select>
     </div>
-    <button class="primary" :disabled="loading || !canSubmit" @click="submit">
-      {{ loading ? '建立中…' : '送出建立' }}
-    </button>
+    <div class="form-row">
+      <label>externalId（選填，Upsert 用）</label>
+      <input v-model="form.externalId" placeholder="例如：PRAC-0001（醫事人員證號）" />
+      <div class="hint">
+        帶入穩定的證號後可用「Upsert 送出」：同一個 externalId 重複送出會
+        更新既有資源，而非每次都建立新的
+      </div>
+    </div>
+    <div class="button-row">
+      <button class="primary" :disabled="loading || !canSubmit" @click="submit">
+        {{ loading ? '建立中…' : '送出建立' }}
+      </button>
+      <button class="ghost" :disabled="loading || !canSubmit || !form.externalId" @click="upsert">
+        {{ loading ? '處理中…' : 'Upsert 送出' }}
+      </button>
+    </div>
   </div>
 
   <JsonPreviewPanel endpoint="/practitioners" :payload="form" :disabled="!canSubmit" filename="practitioner" />
@@ -39,16 +52,16 @@ import { registerResource } from '../store';
 import ResourceResultCard from '../components/ResourceResultCard.vue';
 import JsonPreviewPanel from '../components/JsonPreviewPanel.vue';
 
-const form = reactive({ family: '', given: '', gender: 'male' });
+const form = reactive({ family: '', given: '', gender: 'male', externalId: '' });
 const result = ref(null);
 const loading = ref(false);
 const canSubmit = computed(() => form.family && form.given);
 
-async function submit() {
+async function send(method) {
   loading.value = true;
   result.value = null;
   try {
-    const r = await api.post('/practitioners', { ...form });
+    const r = await api({ method, url: '/practitioners', data: { ...form } });
     result.value = r.data;
     if (r.data.id) {
       registerResource('Practitioner', r.data.id, `${form.family}${form.given}（Practitioner/${r.data.id}）`);
@@ -59,4 +72,7 @@ async function submit() {
     loading.value = false;
   }
 }
+
+const submit = () => send('post');
+const upsert = () => send('put');
 </script>

@@ -15,9 +15,22 @@
         <option :value="false">active = false</option>
       </select>
     </div>
-    <button class="primary" :disabled="loading || !form.name" @click="submit">
-      {{ loading ? '建立中…' : '送出建立' }}
-    </button>
+    <div class="form-row">
+      <label>externalId（選填，Upsert 用）</label>
+      <input v-model="form.externalId" placeholder="例如：HOSP-A（院所代碼）" />
+      <div class="hint">
+        帶入穩定的機構代碼後可用「Upsert 送出」：同一個 externalId 重複送出會
+        更新既有資源，而非每次都建立新的
+      </div>
+    </div>
+    <div class="button-row">
+      <button class="primary" :disabled="loading || !form.name" @click="submit">
+        {{ loading ? '建立中…' : '送出建立' }}
+      </button>
+      <button class="ghost" :disabled="loading || !form.name || !form.externalId" @click="upsert">
+        {{ loading ? '處理中…' : 'Upsert 送出' }}
+      </button>
+    </div>
   </div>
 
   <JsonPreviewPanel endpoint="/organizations" :payload="form" :disabled="!form.name" filename="organization" />
@@ -32,15 +45,15 @@ import { registerResource } from '../store';
 import ResourceResultCard from '../components/ResourceResultCard.vue';
 import JsonPreviewPanel from '../components/JsonPreviewPanel.vue';
 
-const form = reactive({ name: '', active: true });
+const form = reactive({ name: '', active: true, externalId: '' });
 const result = ref(null);
 const loading = ref(false);
 
-async function submit() {
+async function send(method) {
   loading.value = true;
   result.value = null;
   try {
-    const r = await api.post('/organizations', { ...form });
+    const r = await api({ method, url: '/organizations', data: { ...form } });
     result.value = r.data;
     if (r.data.id) registerResource('Organization', r.data.id, `${form.name || '測試醫院'}（Organization/${r.data.id}）`);
   } catch (err) {
@@ -49,4 +62,7 @@ async function submit() {
     loading.value = false;
   }
 }
+
+const submit = () => send('post');
+const upsert = () => send('put');
 </script>

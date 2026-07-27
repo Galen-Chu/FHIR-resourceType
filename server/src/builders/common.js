@@ -28,10 +28,13 @@ function randomValue(prefix) {
   return `${prefix}-${crypto.randomInt(10000000, 99999999)}`;
 }
 
-function makeIdentifier(resourceKey, prefix) {
+// externalId（選填）：呼叫端提供的穩定業務識別碼（病歷號、機構代碼等）。
+// 有帶時用它——同一個 externalId 重複建立會被 Upsert 端點視為同一筆資源；
+// 未帶時維持原本隨機產生的行為（相容既有 7 個建立表單，每次都是新資源）
+function makeIdentifier(resourceKey, prefix, externalId) {
   return {
     system: `urn:test:tw-exchange:${resourceKey}-id`,
-    value: randomValue(prefix)
+    value: externalId || randomValue(prefix)
   };
 }
 

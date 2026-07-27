@@ -7,7 +7,7 @@ function buildOrganization(input = {}, ig) {
   return {
     resourceType: 'Organization',
     meta: meta('Organization', ig),
-    identifier: [makeIdentifier('organization', 'tw-org')],
+    identifier: [makeIdentifier('organization', 'tw-org', input.externalId)],
     active: input.active !== undefined ? Boolean(input.active) : true,
     type: [
       {

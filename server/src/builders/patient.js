@@ -10,7 +10,7 @@ function buildPatient(input = {}, ig) {
   const resource = {
     resourceType: 'Patient',
     meta: meta('Patient', ig),
-    identifier: [makeIdentifier('patient', 'tw-pat')],
+    identifier: [makeIdentifier('patient', 'tw-pat', input.externalId)],
     active: true,
     name: [
       {

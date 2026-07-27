@@ -71,4 +71,18 @@ async function get(path, params, env) {
   return r;
 }
 
-module.exports = { post, get, resolveEnv };
+// Upsert：FHIR conditional update（PUT /{resourceType}?identifier=system|value）。
+// HAPI 依 identifier 搜尋後自己判斷新增或更新（0 筆新增／1 筆更新／多筆 412），
+// 搜尋與寫入在 Server 端是原子操作——比 Gateway 自己刻「先查後寫」更可靠
+async function upsert(resourceType, resource, identifier, env) {
+  const e = resolveEnv(env);
+  const query = `identifier=${encodeURIComponent(`${identifier.system}|${identifier.value}`)}`;
+  const path = `/${resourceType}?${query}`;
+  logger.request('PUT', path, resource, e);
+  const started = Date.now();
+  const r = await clientFor(e).put(path, resource);
+  logger.response(r.status, r.statusText, describeResult(r), Date.now() - started, e);
+  return r;
+}
+
+module.exports = { post, get, upsert, resolveEnv };

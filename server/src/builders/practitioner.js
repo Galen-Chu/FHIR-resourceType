@@ -8,7 +8,7 @@ function buildPractitioner(input = {}, ig) {
   return {
     resourceType: 'Practitioner',
     meta: meta('Practitioner', ig),
-    identifier: [makeIdentifier('practitioner', 'tw-prac')],
+    identifier: [makeIdentifier('practitioner', 'tw-prac', input.externalId)],
     active: true,
     name: [
       {

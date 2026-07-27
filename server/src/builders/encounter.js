@@ -11,7 +11,7 @@ function buildEncounter(input = {}, ig) {
   const resource = {
     resourceType: 'Encounter',
     meta: meta('Encounter', ig),
-    identifier: [makeIdentifier('encounter', 'tw-enc')],
+    identifier: [makeIdentifier('encounter', 'tw-enc', input.externalId)],
     status: input.status || 'in-progress',
     class: {
       system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
