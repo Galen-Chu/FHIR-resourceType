@@ -1,6 +1,6 @@
 {
   "name": "fhir-exchange-test-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "FHIR 交換測試系統 - Express 中介 API（TW Core IG，七大 ResourceType）",
   "main": "src/index.js",
   "type": "commonjs",

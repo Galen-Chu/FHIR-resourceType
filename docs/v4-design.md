@@ -458,7 +458,16 @@ monitor/tests/test_parser.py
 
 ---
 
-## 6. CI/CD 與版本釋出控制
+## 6. CI/CD 與版本釋出控制 ✅ 已完成
+
+> 實作與設計稿一致，`working-directory` 改用 `defaults.run` 設定（等效，
+> 寫法更簡潔）。版本號決策：v4 六項全部向下相容、未變更既有 API 行為，
+> 依語意化版本規則判斷為 MINOR（`1.0.0` → `1.1.0`），不是設計稿列的兩個
+> 選項之一的 `1.6.0`（那個編號規則沒有語意化版本上的意義）或 `2.0.0`
+> （沒有 breaking change，用 MAJOR 不合理）。三個 CI job 的指令都已用
+> `npm ci`（而非 `npm install`，更貼近 CI 實際行為）在本機跑過一次
+> 確認會成功；`act`（本地跑 GitHub Actions 的工具）在此開發環境未安裝，
+> 無法對 YAML 本身做端到端驗證，僅驗證了各 job 實際執行的指令。
 
 ### GitHub Actions
 

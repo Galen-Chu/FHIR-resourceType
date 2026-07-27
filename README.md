@@ -5,8 +5,9 @@
 一次性建置七種 ResourceType，符合 **TW Core IG** 規範，可在
 **台灣 TW Core 測試站**與 **HAPI 國際公開站**之間自由切換寫入/查詢目標，
 並提供 JSON 規格預覽、驗證證據產出工具與 CDS Hooks 臨床決策支援端點。
-v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、IG 矩陣、鑑權去重等）；
-異構資料清洗與 Python 子系統合流則規劃於 v5。詳見下方[擴充藍圖](#擴充藍圖v4--v5-規劃中)。
+v4（現有 Node.js/Vue 技術棧內的寫入強健度擴充：Upsert、IG 矩陣、鑑權去重、
+ISO 8601 校準、監控台、CI/CD）**六項已全部完成**；異構資料清洗與 Python
+子系統合流規劃於 v5。詳見下方[擴充藍圖](#擴充藍圖v4--v5-規劃中)。
 
 | 項目 | 內容 |
 | --- | --- |
@@ -21,15 +22,17 @@ v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、I
 
 ## 擴充藍圖（v4 / v5 規劃中）
 
-本專案定位為「醫療中介軟體（Middleware）」的完整實作佐證，目前 v1–v3
-涵蓋了資源建立、JSON 預覽、環境切換、驗證證據與 CDS Hooks。剩餘缺口依
-「是否會被 v5 系統合流重做」拆為兩個階段，避免同一段清洗邏輯先用 JS 寫一次、
-合流時又用 Python 重寫一次：
+本專案定位為「醫療中介軟體（Middleware）」的完整實作佐證，v1–v3 涵蓋了
+資源建立、JSON 預覽、環境切換、驗證證據與 CDS Hooks；**v4 已全部完成**，
+補齊寫入強健度（Upsert、IG 矩陣、鑑權去重、ISO 8601 校準）與工程嚴謹度
+（Jest/Pytest 測試、CI、監控台、版本釋出控制）。當初依「是否會被 v5
+系統合流重做」拆為兩個階段，避免同一段清洗邏輯先用 JS 寫一次、合流時
+又用 Python 重寫一次：
 
-- **v4**：在現有 Node.js/Vue 技術棧內完成，皆為 Express Gateway／builder 層
-  的邏輯，與未來是否合流無關，現在做不會被推翻
-- **v5**：與 `FHIR-bioMedData`（Python 清洗引擎）合流時一併實作，讓異構資料
-  清洗直接以 Python 一次到位
+- **v4**（已完成）：在現有 Node.js/Vue 技術棧內完成，皆為 Express
+  Gateway／builder 層的邏輯，與未來是否合流無關，不會被推翻
+- **v5**（規劃中）：與 `FHIR-bioMedData`（Python 清洗引擎）合流時一併
+  實作，讓異構資料清洗直接以 Python 一次到位
 
 （🔴 核心賣點／🟠 高優先／🟡 中優先，狀態即時更新於下方版本演進紀錄）：
 
@@ -42,7 +45,7 @@ v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、I
 | 🟠 | 鑑權與去重防禦 | ✅ 已完成 | 新增 Gateway 自身的 `X-Gateway-Key` 鑑權（選用）；上游 401/403 明確診斷 log；Upsert 遇到 412（identifier 對應多筆既有資源）轉譯為 `409` + 明確錯誤訊息 |
 | 🟡 | ISO 8601 時間格式校準層 | ✅ 已完成 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period`、`onsetDateTime`）統一格式驗證與校準，取代原本的直接透傳；手動曆法檢查攔截不存在的日期（如 2/30、非閏年 2/29），不依賴 `Date` 物件的寬鬆解析。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
 | 🟡 | CLI + Streamlit 即時監控台 | ✅ 已完成 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `server/logs/exchange.log` 即時視覺化建立數、環境分布、成功率、回應時間、CDS Hooks 觸發次數；僅唯讀觀測、不參與主資料流，是本 repo 首次引入 Pytest 之處，也是 v5 合流前驗證 Node + Python 於同一 repo 共存的暖身 |
-| 🟡 | CI/CD 與版本釋出控制 | 規劃中 | GitHub Actions（lint + 測試 + `npm run validate`）、語意化版本 tag、CHANGELOG.md |
+| 🟡 | CI/CD 與版本釋出控制 | ✅ 已完成 | GitHub Actions 三個平行 job（server Jest／client build／monitor Pytest）；`CHANGELOG.md`（Keep a Changelog）；server／client 版本號依語意化版本規則同步遞增至 `1.1.0`（v4 全部向下相容，故為 MINOR） |
 
 ### v5 — 系統合流與異構資料清洗（規劃中）
 
@@ -308,15 +311,34 @@ info / warning / critical 卡片。環境依 `X-FHIR-Env` header 決定
 
 ## 測試
 
-server 端單元測試（Jest，v4 起導入）：
+server 端單元測試（Jest，v4 起導入，共 53 個測試案例）：
 
 ```bash
 cd server
 npm test
 ```
 
-目前涵蓋範圍：`server/src/builders/dateUtils.js` 的 ISO 8601 校準邏輯
-（含手動曆法檢查的邊界情境）與 builder 整合測試，共 21 個測試案例。
+涵蓋範圍：ISO 8601 校準（含手動曆法檢查邊界情境）、IG Profile 矩陣、
+Upsert + Race Condition 防禦、Gateway 鑑權、412→409 去重轉譯、
+`fhirClient` 診斷 log。
+
+`monitor/` 的 log 解析測試（Pytest，共 16 個測試案例）：
+
+```bash
+cd monitor
+pip install -r requirements.txt
+pytest -v
+```
+
+### CI（GitHub Actions，v4）
+
+`.github/workflows/ci.yml` 在每次 push / PR 時平行執行三個 job：
+server（`npm test`）、client（`npm run build`）、monitor（`pytest`）。
+`npm run validate` 因需要對外呼叫真實 FHIR Server 且非冪等，故意不放進
+CI，維持手動執行、證據存進 `docs/validation/` 的既有作法。
+
+版本歷程見 [CHANGELOG.md](CHANGELOG.md)（遵循 Keep a Changelog 格式，
+聚焦「哪個版本改了什麼」；「為什麼這樣設計」見下方版本演進紀錄）。
 
 ## 驗證證據（docs/validation/）
 
@@ -400,7 +422,30 @@ npm run validate -- --env all     # 對兩個環境都驗證
 3. ✅ 鑑權與去重防禦
 4. ✅ ISO 8601 時間格式校準層（結構化輸入部分）
 5. ✅ CLI + Streamlit 即時監控台
-6. CI/CD 與版本釋出控制
+6. ✅ CI/CD 與版本釋出控制
+
+**v4 六項全部完成**，累計新增 69 個測試案例（server 53 個 Jest + monitor
+16 個 Pytest），server／client 版本號同步遞增至 `1.1.0`。
+
+#### v4.6 — CI/CD 與版本釋出控制（已完成）
+
+- 新增 `.github/workflows/ci.yml`：push / PR 時平行執行三個 job
+  - `server`：`npm ci` + `npm test`（Jest，53 個測試）
+  - `client`：`npm ci` + `npm run build`（確保 Vue 專案打包不壞）
+  - `monitor`：`pip install -r requirements.txt` + `pytest`（16 個測試）
+  - `npm run validate` 需要對外呼叫真實 twcore / hapi.fhir.org 且非
+    冪等（會實際寫入測試站），故意不放進 CI，維持手動執行的既有作法
+- 新增根目錄 `CHANGELOG.md`（Keep a Changelog 格式），補上 v1.0.0
+  （v1–v3）與 v1.1.0（v4）的條目，與本節「版本演進紀錄」互相對照但
+  服務不同讀者（README 講「為什麼」、CHANGELOG 講「哪個版本改了什麼」）
+- `server/package.json`、`client/package.json` 版本號從 `1.0.0` 遞增至
+  `1.1.0`：v4 六項全部是向下相容的新增功能（新端點、新選填欄位、新
+  header），未變更既有 API 行為，依語意化版本規則屬 MINOR 而非 MAJOR
+- 三個 job 的指令都在本機實際執行過一次（`npm ci` 而非 `npm install`，
+  更貼近 CI 實際行為）確認會成功，同時順手跑了 `npm audit fix`
+  清掉可安全修復的漏洞（body-parser）；剩餘的高風險項目全部是 jest/vite
+  開發工具鏈本身的間接依賴，修復需要降版本（breaking change），評估後
+  不值得為了清乾淨 audit 報告犧牲工具鏈穩定性，保留現狀
 
 #### v4.5 — CLI + Streamlit 即時監控台（已完成）
 

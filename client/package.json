@@ -1,6 +1,6 @@
 {
   "name": "fhir-exchange-test-client",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "FHIR 交換測試系統 - Vue 3 前端（7 建立 + 2 查詢）",
   "private": true,
   "type": "module",
