@@ -1,8 +1,12 @@
 # v4 技術設計草案 — Node 端寫入強健度擴充
 
-對應 [README 擴充藍圖](../README.md#擴充藍圖v4--v5-規劃中) 的六個 v4 項目。
-開發時依 1→6 順序逐項實作，本文件先把介面、資料結構與邊界情境定案，
-避免邊做邊改動到已完成項目的介面。
+對應 [README 擴充藍圖](../README.md#擴充藍圖v4-已完成v5-設計規劃中) 的六個 v4
+項目（**已全部完成**）。開發時依 1→6 順序逐項實作，本文件先把介面、
+資料結構與邊界情境定案，避免邊做邊改動到已完成項目的介面。
+
+> 文件內第 5 節原本提到的「v5 系統合流」規劃已變更：異構資料清洗改為
+> 在獨立的 `FHIR-bioMedData` repo 開發，不併入本 repo。相關段落保留
+> 作為設計構想紀錄，不代表目前的開發計畫，詳見 README 版本演進紀錄。
 
 所有項目維持現有慣例：CommonJS、手刻工具函式（不隨意引入重量套件）、
 builder / route 工廠 / fhirClient 單一出口的既有分層不變。
@@ -352,7 +356,8 @@ function toIsoDateTime(value, fieldName) {
 module.exports = { toIsoDate, toIsoDateTime };
 ```
 
-套用範圍（僅結構化輸入的格式校驗，不含 v5 清洗層要處理的民國年等異質格式轉換）：
+套用範圍（僅結構化輸入的格式校驗，不含民國年等異質格式轉換——那屬於
+異構資料清洗範疇，於獨立的 `FHIR-bioMedData` repo 處理）：
 
 | Builder | 欄位 | 函式 |
 | --- | --- | --- |
@@ -385,9 +390,8 @@ server/test/dateUtils.test.js
 ### 定位
 
 獨立唯讀輔助工具，只讀 `server/logs/exchange.log`，**不呼叫任何 API、
-不參與主資料流**——維持核心系統 Node.js/Vue 技術棧的單一性，同時是
-v5 合流前驗證「同一 repo 內 Node + Python 共存」的暖身。也是這個 repo
-第一個引入 Pytest 的地方，呼應自傳原文用字。
+不參與主資料流**——維持核心系統 Node.js/Vue 技術棧的單一性。也是這個
+repo 第一個引入 Pytest 的地方，呼應自傳原文用字。
 
 ### 檔案結構
 

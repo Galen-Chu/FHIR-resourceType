@@ -5,9 +5,11 @@
 一次性建置七種 ResourceType，符合 **TW Core IG** 規範，可在
 **台灣 TW Core 測試站**與 **HAPI 國際公開站**之間自由切換寫入/查詢目標，
 並提供 JSON 規格預覽、驗證證據產出工具與 CDS Hooks 臨床決策支援端點。
-v4（現有 Node.js/Vue 技術棧內的寫入強健度擴充：Upsert、IG 矩陣、鑑權去重、
-ISO 8601 校準、監控台、CI/CD）**六項已全部完成**；異構資料清洗與 Python
-子系統合流規劃於 v5。詳見下方[擴充藍圖](#擴充藍圖v4--v5-規劃中)。
+**v1–v4 開發階段已全部完成**：v1–v3 為講評回饋迭代，v4 為 Node.js/Vue
+技術棧內的寫入強健度擴充（Upsert、IG 矩陣、鑑權去重、ISO 8601 校準、
+監控台、CI/CD）。異構資料清洗（v5）目前僅為設計規劃，**不在本 repo
+開發**——實際的清洗服務改於獨立的 [`FHIR-bioMedData`](https://github.com/Galen-Chu/FHIR-bioMedData)
+repo 進行功能優化。詳見下方[擴充藍圖](#擴充藍圖v4-已完成v5-設計規劃中)。
 
 | 項目 | 內容 |
 | --- | --- |
@@ -20,19 +22,18 @@ ISO 8601 校準、監控台、CI/CD）**六項已全部完成**；異構資料�
 | 測試 | Jest（server 端）、Pytest（`monitor/`，v4 起導入） |
 | 監控 | Streamlit 即時數據池監控台（`monitor/`，選用、獨立唯讀，v4） |
 
-## 擴充藍圖（v4 / v5 規劃中）
+## 擴充藍圖（v4 已完成／v5 設計規劃中）
 
-本專案定位為「醫療中介軟體（Middleware）」的完整實作佐證，v1–v3 涵蓋了
-資源建立、JSON 預覽、環境切換、驗證證據與 CDS Hooks；**v4 已全部完成**，
-補齊寫入強健度（Upsert、IG 矩陣、鑑權去重、ISO 8601 校準）與工程嚴謹度
-（Jest/Pytest 測試、CI、監控台、版本釋出控制）。當初依「是否會被 v5
-系統合流重做」拆為兩個階段，避免同一段清洗邏輯先用 JS 寫一次、合流時
-又用 Python 重寫一次：
+本專案定位為「醫療中介軟體（Middleware）」的完整實作佐證。**v1–v4 開發
+階段已全部完成**：v1–v3 涵蓋資源建立、JSON 預覽、環境切換、驗證證據與
+CDS Hooks；v4 補齊寫入強健度（Upsert、IG 矩陣、鑑權去重、ISO 8601
+校準）與工程嚴謹度（Jest/Pytest 測試、CI、監控台、版本釋出控制）。
 
 - **v4**（已完成）：在現有 Node.js/Vue 技術棧內完成，皆為 Express
-  Gateway／builder 層的邏輯，與未來是否合流無關，不會被推翻
-- **v5**（規劃中）：與 `FHIR-bioMedData`（Python 清洗引擎）合流時一併
-  實作，讓異構資料清洗直接以 Python 一次到位
+  Gateway／builder 層的邏輯
+- **v5**（設計規劃中，**不在本 repo 開發**）：異構資料清洗前置層目前
+  停留在架構設計階段，實際的清洗服務改於獨立的 `FHIR-bioMedData` repo
+  進行功能優化——兩個 repo 各自完整、各自可獨立展示，不合流
 
 （🔴 核心賣點／🟠 高優先／🟡 中優先，狀態即時更新於下方版本演進紀錄）：
 
@@ -43,15 +44,20 @@ ISO 8601 校準、監控台、CI/CD）**六項已全部完成**；異構資料�
 | 🔴 | Upsert 覆寫機制 | ✅ 已完成 | 新增 `PUT /api/{resource}`：以 FHIR conditional update 依穩定的 `externalId` 判斷已存在則更新、不存在則新增；同 externalId 的併發寫入以 per-key 序列化佇列防止 Race Condition |
 | 🟠 | IG Profile 切換矩陣 | ✅ 已完成 | `PROFILES` 改為 `IG_PROFILES` 矩陣（`tw-core` / `r4-base`），新增 `X-FHIR-IG` header 與既有 `X-FHIR-Env` 環境切換平行運作、可交叉組合；前端側邊欄新增 IG 選擇器 |
 | 🟠 | 鑑權與去重防禦 | ✅ 已完成 | 新增 Gateway 自身的 `X-Gateway-Key` 鑑權（選用）；上游 401/403 明確診斷 log；Upsert 遇到 412（identifier 對應多筆既有資源）轉譯為 `409` + 明確錯誤訊息 |
-| 🟡 | ISO 8601 時間格式校準層 | ✅ 已完成 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period`、`onsetDateTime`）統一格式驗證與校準，取代原本的直接透傳；手動曆法檢查攔截不存在的日期（如 2/30、非閏年 2/29），不依賴 `Date` 物件的寬鬆解析。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
-| 🟡 | CLI + Streamlit 即時監控台 | ✅ 已完成 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `server/logs/exchange.log` 即時視覺化建立數、環境分布、成功率、回應時間、CDS Hooks 觸發次數；僅唯讀觀測、不參與主資料流，是本 repo 首次引入 Pytest 之處，也是 v5 合流前驗證 Node + Python 於同一 repo 共存的暖身 |
+| 🟡 | ISO 8601 時間格式校準層 | ✅ 已完成 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period`、`onsetDateTime`）統一格式驗證與校準，取代原本的直接透傳；手動曆法檢查攔截不存在的日期（如 2/30、非閏年 2/29），不依賴 `Date` 物件的寬鬆解析。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬異構資料清洗範疇，該服務於獨立的 `FHIR-bioMedData` repo 開發 |
+| 🟡 | CLI + Streamlit 即時監控台 | ✅ 已完成 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `server/logs/exchange.log` 即時視覺化建立數、環境分布、成功率、回應時間、CDS Hooks 觸發次數；僅唯讀觀測、不參與主資料流，是本 repo 首次引入 Pytest 之處 |
 | 🟡 | CI/CD 與版本釋出控制 | ✅ 已完成 | GitHub Actions 三個平行 job（server Jest／client build／monitor Pytest）；`CHANGELOG.md`（Keep a Changelog）；server／client 版本號依語意化版本規則同步遞增至 `1.1.0`（v4 全部向下相容，故為 MINOR） |
 
-### v5 — 系統合流與異構資料清洗（規劃中）
+### v5 — 異構資料清洗（設計規劃中，不在本 repo 開發）
+
+曾規劃過與 `FHIR-bioMedData` 合流、在本 repo 新增 Python 清洗前置層，
+評估後改變方向：**異構資料清洗維持在 `FHIR-bioMedData` 獨立開發與優化**，
+不併入 `FHIR-resourceType`。兩個 repo 對應自傳不同段落的技術主張，各自
+完整、各自可獨立展示：
 
 | 優先級 | 項目 | 現況 | 說明 |
 | --- | --- | --- | --- |
-| 🔴 | 異構資料清洗前置層 | 規劃中 | 與 `FHIR-bioMedData` 合流：移植其 Config Matrix（院所欄位對齊、性別字典、民國年轉換）為清洗前置層，新增 `POST /api/ingest/{resource}` 讀取 HIS/LIS 風格異構 CSV/JSON，正規化後呼叫既有 builder 產出 TW Core 資源；直接以 Python 實作，避免 v4 階段用 JS 重工 |
+| 🔴 | 異構資料清洗前置層 | 設計規劃中（開發於 `FHIR-bioMedData`） | Config Matrix（院所欄位對齊、性別字典、民國年轉換）等清洗邏輯的優化與擴充，於獨立的 `FHIR-bioMedData` repo 進行，不在此 repo 實作 |
 
 ## 系統架構
 
@@ -411,11 +417,11 @@ npm run validate -- --env all     # 對兩個環境都驗證
 | 4 | 建議 1 | `npm run validate`：批次產出資源 JSON 與 `$validate` 報告至 `docs/validation/` |
 | 5 | 建議 3 | CDS Hooks：discovery + patient-summary（生命徵象警示）+ medication-duplicate-check（重複用藥） |
 
-### v4 — 寫入強健度擴充（規劃中，現有技術棧內完成）
+### v4 — 寫入強健度擴充（已完成，現有技術棧內完成）
 
 聚焦「醫療中介軟體」尚未覆蓋的寫入強健度：防禦併發寫入造成的髒資料、
-標準規格深度、觀測工具。皆為 Express Gateway／builder 層邏輯，與 v5 是否
-合流無關。項目與優先級詳見上方[擴充藍圖](#擴充藍圖v4--v5-規劃中)，開發順序：
+標準規格深度、觀測工具。皆為 Express Gateway／builder 層邏輯。項目與
+優先級詳見上方[擴充藍圖](#擴充藍圖v4-已完成v5-設計規劃中)，開發順序：
 
 1. ✅ Upsert 覆寫機制 + 併發序列化寫入
 2. ✅ IG Profile 切換矩陣
@@ -539,22 +545,23 @@ npm run validate -- --env all     # 對兩個環境都驗證
   `Number.isNaN(new Date(v).getTime())` 判斷會漏掉這類不存在日期
 - 套用於 `patient.js`（`birthDate`）、`encounter.js`（`period.start/end`）、
   `condition.js`（`onsetDateTime`）；僅處理已結構化輸入，原始異質格式
-  （如民國年）的轉換留給 v5 清洗層
+  （如民國年）的轉換屬異構資料清洗範疇，於獨立的 `FHIR-bioMedData` repo 處理
 - 順手修正 `ValidationError` / `createRoute.js`：新增 FHIR `IssueType`
   區分 `required`（缺欄位）與 `value`（格式不合法），避免格式錯誤被
   誤標成「缺少必填欄位」
 - 本 repo 首次導入 Jest（`server/package.json` 新增 `npm test`），
   21 個測試案例涵蓋日期校準的邊界情境與 builder 整合
 
-### v5 — 系統合流與異構資料清洗（規劃中）
+### v5 — 異構資料清洗（設計規劃中，不在本 repo 開發）
 
-與 `FHIR-bioMedData`（Python 清洗引擎）合流，補上「接收異構外部資料源」
-這塊能力，讓專案完整涵蓋「異構清洗 → API 網關 → FHIR 標準化落庫」的
-端到端流程：
+原規劃與 `FHIR-bioMedData`（Python 清洗引擎）合流，在本 repo 新增
+`POST /api/ingest/{resource}` 補上「接收異構外部資料源」的能力。評估
+後改變方向：**異構資料清洗維持在 `FHIR-bioMedData` 獨立開發與優化**，
+不併入本 repo——兩個 repo 對應自傳不同段落的技術主張，各自完整、各自
+可獨立展示：
 
-1. 移植 Config Matrix（院所欄位對齊、性別字典、民國年轉換）為 Python
-   清洗前置層
-2. 新增 `POST /api/ingest/{resource}`：清洗結果串接既有 v1–v4 builder /
-   Upsert / IG 矩陣邏輯，不重複實作寫入層
+- `FHIR-resourceType`（本 repo）：API 網關、多 FHIR Server／IG 標準
+  切換、Upsert 寫入強健度、CDS 臨床決策支援
+- `FHIR-bioMedData`：異構欄位映射、Config Matrix、CLI 驅動的清洗引擎
 
-各項目完成後會更新對應狀態欄位（規劃中 → 已完成）並移至上方版本表中。
+此節保留作為當初的設計構想紀錄，不代表本 repo 的開發計畫。
