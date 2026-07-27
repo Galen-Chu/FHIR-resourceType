@@ -6,17 +6,19 @@ const fhirClient = require('../fhirClient');
 const logger = require('../logger');
 const { ValidationError } = require('../builders/common');
 
-// 缺必填欄位時回傳與 FHIR Server 一致的 OperationOutcome 格式，
-// 前端紅色結果卡片可直接顯示
+// 欄位驗證失敗時回傳與 FHIR Server 一致的 OperationOutcome 格式，
+// 前端紅色結果卡片可直接顯示。code 沿用 ValidationError 的 IssueType
+// （required：缺欄位／value：格式不合法），diagnostics 對應調整措辭
 function validationOutcome(err) {
+  const label = err.code === 'value' ? 'invalid field value(s)' : 'missing required field(s)';
   return {
     resourceType: 'OperationOutcome',
     issue: [
       {
         severity: 'error',
-        code: 'required',
+        code: err.code,
         details: { text: err.message },
-        diagnostics: `missing required field(s): ${err.missing.join(', ')}`
+        diagnostics: `${label}: ${err.missing.join(', ')}`
       }
     ]
   };

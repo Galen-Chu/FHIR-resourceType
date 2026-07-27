@@ -3,6 +3,7 @@
 // 關鍵 reference：subject → Patient、serviceProvider → Organization、participant → Practitioner
 // 已確認：不建立 PractitionerRole，participant 直接引用 Practitioner
 const { makeIdentifier, meta, reference, requireFields } = require('./common');
+const { toIsoDateTime } = require('./dateUtils');
 
 function buildEncounter(input = {}) {
   requireFields(input, ['patientId', 'organizationId', 'practitionerId']);
@@ -19,8 +20,8 @@ function buildEncounter(input = {}) {
     },
     subject: reference('Patient', input.patientId),
     period: {
-      start: input.periodStart || now,
-      ...(input.periodEnd ? { end: input.periodEnd } : {})
+      start: input.periodStart ? toIsoDateTime(input.periodStart, 'periodStart') : now,
+      ...(input.periodEnd ? { end: toIsoDateTime(input.periodEnd, 'periodEnd') } : {})
     },
     participant: [
       {

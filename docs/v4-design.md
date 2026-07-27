@@ -291,7 +291,13 @@ server/test/dedupe.test.js        — mock fhirClient 回 412 → route 回 409 
 
 ---
 
-## 4. ISO 8601 時間格式校準層
+## 4. ISO 8601 時間格式校準層 ✅ 已完成
+
+> 實作與設計稿唯一的差異：`toIsoDate`/`toIsoDateTime` 改用手動曆法檢查
+> （年/月/日拆解 + 月份天數表），而非設計稿原本設想的
+> `Number.isNaN(new Date(v).getTime())`——後者對 `2024-02-30` 這類不存在
+> 的日期會被 `Date` 靜默捲動成 `2024-03-01`、不會回傳 `NaN`，測試階段才
+> 發現這個落差，已在 `server/test/dateUtils.test.js` 加對應迴歸測試。
 
 ### 現況
 

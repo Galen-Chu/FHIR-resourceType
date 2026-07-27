@@ -16,6 +16,7 @@ v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、I
 | FHIR Server | 雙環境可切換：`twcore.hapi.fhir.tw/fhir`（預設）/ `hapi.fhir.org/baseR4`（FHIR R4） |
 | 臨床決策支援 | CDS Hooks（patient-view、order-select） |
 | 驗證 | JSON 規格預覽、`$validate` 批次驗證工具、結構化 Log 存證 |
+| 測試 | Jest（server 端單元測試，v4 起導入） |
 
 ## 擴充藍圖（v4 / v5 規劃中）
 
@@ -38,7 +39,7 @@ v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、I
 | 🔴 | Upsert 覆寫機制 | 規劃中 | 依 `identifier` 判斷資源已存在則更新、不存在則新增；同 identifier 的併發寫入以序列化佇列防止 Race Condition |
 | 🟠 | IG Profile 切換矩陣 | 規劃中 | `PROFILES` 由寫死單組改為依 IG 版本（TW Core 版號 / 未來可擴充其他 Core IG）動態組裝，前端可選擇目標 IG |
 | 🟠 | 鑑權與去重防禦 | 規劃中 | 落實 `FHIR_AUTH_TOKEN` Bearer Token 流程；寫入前依 identifier 做去重檢查，防止外部來源重複資料落庫 |
-| 🟡 | ISO 8601 時間格式校準層 | 規劃中 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period` 等）統一格式驗證與校準，取代目前的直接透傳。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
+| 🟡 | ISO 8601 時間格式校準層 | ✅ 已完成 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period`、`onsetDateTime`）統一格式驗證與校準，取代原本的直接透傳；手動曆法檢查攔截不存在的日期（如 2/30、非閏年 2/29），不依賴 `Date` 物件的寬鬆解析。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
 | 🟡 | CLI + Streamlit 即時監控台 | 規劃中 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `logs/exchange.log` 即時視覺化建立數、環境分布、CDS 觸發次數；僅唯讀觀測、不參與主資料流，作為 v5 合流前先驗證 Node + Python 於同一 repo 共存的暖身 |
 | 🟡 | CI/CD 與版本釋出控制 | 規劃中 | GitHub Actions（lint + 測試 + `npm run validate`）、語意化版本 tag、CHANGELOG.md |
 
@@ -87,6 +88,7 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 │  │  ├─ logger.js              # 結構化輸出：console + logs/exchange.log 存證
 │  │  ├─ builders/              # TW Core JSON 組裝 × 7
 │  │  │  ├─ common.js           #   identifier / meta / reference / 必填驗證共用工具
+│  │  │  ├─ dateUtils.js        #   ISO 8601 時間格式校準（v4）
 │  │  │  ├─ organization.js … medicationRequest.js
 │  │  ├─ routes/                # 7 資源 route + 2 查詢端點
 │  │  │  ├─ createRoute.js      #   共用工廠：建立 + preview + 400 OperationOutcome
@@ -95,6 +97,9 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 │  │     ├─ index.js            #   discovery 與服務路由
 │  │     ├─ patientSummary.js   #   patient-view：摘要 + 生命徵象警示
 │  │     └─ medicationCheck.js  #   order-select：重複用藥檢查
+│  ├─ test/                     # Jest 單元測試（v4 起導入）
+│  │  ├─ dateUtils.test.js
+│  │  └─ builders.dateCalibration.test.js
 │  ├─ scripts/
 │  │  └─ validate-all.js        # 驗證證據產出工具（npm run validate）
 │  ├─ logs/exchange.log         # 交換存證 log（執行時自動產生，gitignore）
@@ -114,6 +119,7 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 │  ├─ .env.example
 │  └─ package.json
 ├─ docs/
+│  ├─ v4-design.md              # v4 六項技術設計草案
 │  └─ validation/               # 驗證證據：resources / reports / screenshots / logs
 └─ README.md
 ```
@@ -260,6 +266,18 @@ info / warning / critical 卡片。環境依 `X-FHIR-Env` header 決定
 - **回應後**：HTTP status、resource id 或錯誤訊息、耗時 (ms)
 - **實作**：`morgan` 記錄 HTTP 存取層；自訂 `logger.js` 記錄 FHIR 交換細節與檔案存證
 
+## 測試
+
+server 端單元測試（Jest，v4 起導入）：
+
+```bash
+cd server
+npm test
+```
+
+目前涵蓋範圍：`server/src/builders/dateUtils.js` 的 ISO 8601 校準邏輯
+（含手動曆法檢查的邊界情境）與 builder 整合測試，共 21 個測試案例。
+
 ## 驗證證據（docs/validation/）
 
 `server` 內建驗證證據產出工具：
@@ -338,9 +356,25 @@ npm run validate -- --env all     # 對兩個環境都驗證
 1. Upsert 覆寫機制 + 併發序列化寫入
 2. IG Profile 切換矩陣
 3. 鑑權與去重防禦
-4. ISO 8601 時間格式校準層（結構化輸入部分）
+4. ✅ ISO 8601 時間格式校準層（結構化輸入部分）
 5. CLI + Streamlit 即時監控台
 6. CI/CD 與版本釋出控制
+
+#### v4.1 — ISO 8601 時間格式校準層（已完成）
+
+- 新增 `server/src/builders/dateUtils.js`：`toIsoDate` / `toIsoDateTime`，
+  手動曆法檢查（月份天數、閏年 2/29）攔截不存在的日期（如 2/30、非閏年
+  2/29），不依賴 `Date` 物件的寬鬆解析——`new Date('2024-02-30')` 會被
+  靜默捲動成 `2024-03-01` 而非回傳 Invalid Date，若只用
+  `Number.isNaN(new Date(v).getTime())` 判斷會漏掉這類不存在日期
+- 套用於 `patient.js`（`birthDate`）、`encounter.js`（`period.start/end`）、
+  `condition.js`（`onsetDateTime`）；僅處理已結構化輸入，原始異質格式
+  （如民國年）的轉換留給 v5 清洗層
+- 順手修正 `ValidationError` / `createRoute.js`：新增 FHIR `IssueType`
+  區分 `required`（缺欄位）與 `value`（格式不合法），避免格式錯誤被
+  誤標成「缺少必填欄位」
+- 本 repo 首次導入 Jest（`server/package.json` 新增 `npm test`），
+  21 個測試案例涵蓋日期校準的邊界情境與 builder 整合
 
 ### v5 — 系統合流與異構資料清洗（規劃中）
 
