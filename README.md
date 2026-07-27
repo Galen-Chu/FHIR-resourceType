@@ -38,7 +38,7 @@ v4 正規劃於現有 Node.js/Vue 技術棧內補齊寫入強健度（Upsert、I
 | --- | --- | --- | --- |
 | 🔴 | Upsert 覆寫機制 | ✅ 已完成 | 新增 `PUT /api/{resource}`：以 FHIR conditional update 依穩定的 `externalId` 判斷已存在則更新、不存在則新增；同 externalId 的併發寫入以 per-key 序列化佇列防止 Race Condition |
 | 🟠 | IG Profile 切換矩陣 | ✅ 已完成 | `PROFILES` 改為 `IG_PROFILES` 矩陣（`tw-core` / `r4-base`），新增 `X-FHIR-IG` header 與既有 `X-FHIR-Env` 環境切換平行運作、可交叉組合；前端側邊欄新增 IG 選擇器 |
-| 🟠 | 鑑權與去重防禦 | 規劃中 | 落實 `FHIR_AUTH_TOKEN` Bearer Token 流程；寫入前依 identifier 做去重檢查，防止外部來源重複資料落庫 |
+| 🟠 | 鑑權與去重防禦 | ✅ 已完成 | 新增 Gateway 自身的 `X-Gateway-Key` 鑑權（選用）；上游 401/403 明確診斷 log；Upsert 遇到 412（identifier 對應多筆既有資源）轉譯為 `409` + 明確錯誤訊息 |
 | 🟡 | ISO 8601 時間格式校準層 | ✅ 已完成 | builder 層對 Vue 表單送入的結構化日期／時間欄位（`birthDate`、`period`、`onsetDateTime`）統一格式驗證與校準，取代原本的直接透傳；手動曆法檢查攔截不存在的日期（如 2/30、非閏年 2/29），不依賴 `Date` 物件的寬鬆解析。僅處理已結構化輸入；原始異質格式（如民國年）的轉換屬 v5 清洗層範疇 |
 | 🟡 | CLI + Streamlit 即時監控台 | 規劃中 | 獨立輔助工具（`monitor/`，Python + Streamlit），讀取 `logs/exchange.log` 即時視覺化建立數、環境分布、CDS 觸發次數；僅唯讀觀測、不參與主資料流，作為 v5 合流前先驗證 Node + Python 於同一 repo 共存的暖身 |
 | 🟡 | CI/CD 與版本釋出控制 | 規劃中 | GitHub Actions（lint + 測試 + `npm run validate`）、語意化版本 tag、CHANGELOG.md |
@@ -87,6 +87,8 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 │  │  ├─ fhirClient.js          # axios wrapper：依環境路由、Upsert（v4）、預留 auth header 擴充點
 │  │  ├─ igResolver.js          # IG Profile 矩陣切換解析（v4）
 │  │  ├─ logger.js              # 結構化輸出：console + logs/exchange.log 存證
+│  │  ├─ middleware/
+│  │  │  └─ gatewayAuth.js      #   Gateway 自身鑑權（X-Gateway-Key，選用，v4）
 │  │  ├─ utils/
 │  │  │  └─ keyedQueue.js       #   per-identifier 序列化佇列，防 Upsert Race Condition（v4）
 │  │  ├─ builders/              # TW Core JSON 組裝 × 7
@@ -103,7 +105,8 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 │  ├─ test/                     # Jest 單元測試（v4 起導入）
 │  │  ├─ dateUtils.test.js / builders.dateCalibration.test.js
 │  │  ├─ igMatrix.test.js
-│  │  └─ keyedQueue.test.js / upsert.test.js
+│  │  ├─ keyedQueue.test.js / upsert.test.js
+│  │  └─ gatewayAuth.test.js / dedupe.test.js / fhirClientDiagnostics.test.js
 │  ├─ scripts/
 │  │  └─ validate-all.js        # 驗證證據產出工具（npm run validate）
 │  ├─ logs/exchange.log         # 交換存證 log（執行時自動產生，gitignore）
@@ -338,6 +341,8 @@ npm run validate -- --env all     # 對兩個環境都驗證
    直接引用 Practitioner。
 3. **驗證機制** — HAPI 測試站暫不需要 API Key／Bearer Token；`fhirClient.js` 已預留
    auth header 擴充點（設定 `FHIR_AUTH_TOKEN` 環境變數即自動帶入）。
+   Gateway 自身的鑑權（`GATEWAY_API_KEY` / `X-Gateway-Key`）為獨立機制，
+   保護的是 Express `/api` 端點本身，見版本演進紀錄 v4.4 節。
 4. **資源範圍** — 不分階段，一次建置七種 ResourceType。
 
 ## 版本演進紀錄
@@ -376,10 +381,31 @@ npm run validate -- --env all     # 對兩個環境都驗證
 
 1. ✅ Upsert 覆寫機制 + 併發序列化寫入
 2. ✅ IG Profile 切換矩陣
-3. 鑑權與去重防禦
+3. ✅ 鑑權與去重防禦
 4. ✅ ISO 8601 時間格式校準層（結構化輸入部分）
 5. CLI + Streamlit 即時監控台
 6. CI/CD 與版本釋出控制
+
+#### v4.4 — 鑑權與去重防禦（已完成）
+
+呼應自傳「近期我成功解決外部廠商數據冗餘與 URL 鑑權排查」的實戰場景，
+分三個子設計：
+
+- **Gateway 自身鑑權**：新增 `server/src/middleware/gatewayAuth.js`，
+  未設定 `GATEWAY_API_KEY` 時完全不啟用（維持既有免鑑權行為）；設定後
+  每個 `/api` 請求需帶對應的 `X-Gateway-Key` header，否則回 `401`。
+  `/cds-services` 不受影響（規格上是給臨床系統即時呼叫，鑑權機制不同）
+- **上游鑑權失敗診斷**：`fhirClient.js` 統一在收到 401/403 時多記一行
+  結構化 log（含排查提示：檢查 Token 是否過期，或該環境是否需要鑑權），
+  不改變回應內容——前端仍照現有邏輯顯示 OperationOutcome
+- **去重防禦**：Upsert 遇到 identifier 對應多筆既有資源時，HAPI 回
+  `412`；Gateway 攔截並轉譯為更明確的 `409` + `OperationOutcome`
+  （`code: duplicate`，訊息點名是哪個 externalId 疑似重複），取代原本
+  單純透傳 412 的行為。同時在 log 記錄去重診斷（含完整 identifier）
+- 新增 12 個 Jest 測試案例（共 53 個）：Gateway 鑑權的放行/攔截情境、
+  412→409 轉譯（含確認 POST 路徑與其他狀態碼不受影響）、`fhirClient`
+  診斷 log 的觸發條件；實際起 server 驗證 Gateway 鑑權三種情境
+  （未設定 / 缺 header / 錯誤 header / 正確 header）
 
 #### v4.3 — Upsert 覆寫機制 + Race Condition 防禦（已完成）
 

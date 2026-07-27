@@ -5,6 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const config = require('./config');
 const logger = require('./logger');
+const gatewayAuth = require('./middleware/gatewayAuth');
 
 const app = express();
 
@@ -12,6 +13,11 @@ app.use(cors());
 app.use(express.json());
 // morgan 記錄 HTTP 存取層；logger.js 記錄 FHIR 交換細節
 app.use(morgan('[:date[iso]]  :method :url :status :response-time ms'));
+
+// Gateway 自身鑑權（v4）：未設定 GATEWAY_API_KEY 時完全不啟用；
+// 只保護 /api，CDS Hooks（/cds-services）依規格是給臨床系統即時呼叫，
+// 鑑權機制不同，不在本次範圍
+app.use('/api', gatewayAuth);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', defaultEnv: config.DEFAULT_FHIR_ENV, servers: config.FHIR_SERVERS });

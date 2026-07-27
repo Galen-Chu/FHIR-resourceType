@@ -16,6 +16,9 @@ module.exports = {
   PORT: parseInt(process.env.PORT, 10) || 3000,
   // 預留驗證擴充點：HAPI 測試站目前不需要 token，未來啟用時由環境變數帶入
   FHIR_AUTH_TOKEN: process.env.FHIR_AUTH_TOKEN || null,
+  // Gateway 自身的鑑權（v4）：未設定時 /api 完全開放，維持現有行為；
+  // 設定後每個 /api 請求需帶 X-Gateway-Key header 且值需相符
+  GATEWAY_API_KEY: process.env.GATEWAY_API_KEY || null,
 
   // IG Profile 切換矩陣：前端以 X-FHIR-IG header 指定，未指定時用 DEFAULT_IG。
   // 與 X-FHIR-Env（寫入哪個 Server）是獨立維度，可交叉組合（見 docs/v4-design.md 第 2 節）

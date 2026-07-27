@@ -60,18 +60,20 @@ describe('PUT /api/organizations（Upsert）', () => {
     expect(res.body.outcome).toBe('updated');
   });
 
-  test('FHIR Server 回 4xx/5xx 時原樣附上 OperationOutcome', async () => {
+  test('FHIR Server 回一般 4xx/5xx（非 412）時原樣附上 OperationOutcome', async () => {
+    // 412（多筆匹配）自 v4 第 3 項起會被轉譯為 409，見 test/dedupe.test.js；
+    // 這裡測試其他狀態碼仍維持原樣透傳
     fhirClient.upsert.mockResolvedValue({
-      status: 412,
-      data: { resourceType: 'OperationOutcome', issue: [{ severity: 'error', code: 'multiple-matches' }] }
+      status: 422,
+      data: { resourceType: 'OperationOutcome', issue: [{ severity: 'error', code: 'invalid' }] }
     });
     const app = makeApp();
 
     const res = await request(app)
       .put('/api/organizations')
-      .send({ name: '仁愛醫院', externalId: 'HOSP-DUP' });
+      .send({ name: '仁愛醫院', externalId: 'HOSP-BAD' });
 
-    expect(res.status).toBe(412);
+    expect(res.status).toBe(422);
     expect(res.body.outcome.resourceType).toBe('OperationOutcome');
   });
 

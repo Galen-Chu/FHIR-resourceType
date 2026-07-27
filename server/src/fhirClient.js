@@ -53,12 +53,28 @@ function describeResult(r) {
   return '';
 }
 
+// 呼應「URL 鑑權排查」與「外部資料重複」的實戰場景：不改變回應內容
+// （仍照既有邏輯把 4xx/5xx 原樣附 OperationOutcome 給前端），只在 log
+// 多留一行明確診斷，讓排查時有結構化線索可查，而不用重新讀一次 response body
+function logDiagnostics(r, env, identifier) {
+  if (r.status === 401 || r.status === 403) {
+    logger.error(`FHIR Server 鑑權失敗 [${env}]`, {
+      hint: config.FHIR_AUTH_TOKEN
+        ? '檢查 Token 是否過期或 scope 不足'
+        : '未設定 FHIR_AUTH_TOKEN，該環境是否需要鑑權？'
+    });
+  } else if (r.status === 412 && identifier) {
+    logger.error(`Upsert 偵測到重複資料 [${env}]`, { identifier: `${identifier.system}|${identifier.value}` });
+  }
+}
+
 async function post(path, resource, env) {
   const e = resolveEnv(env);
   logger.request('POST', path, resource, e);
   const started = Date.now();
   const r = await clientFor(e).post(path, resource);
   logger.response(r.status, r.statusText, describeResult(r), Date.now() - started, e);
+  logDiagnostics(r, e);
   return r;
 }
 
@@ -68,6 +84,7 @@ async function get(path, params, env) {
   const started = Date.now();
   const r = await clientFor(e).get(path, { params });
   logger.response(r.status, r.statusText, describeResult(r), Date.now() - started, e);
+  logDiagnostics(r, e);
   return r;
 }
 
@@ -82,6 +99,7 @@ async function upsert(resourceType, resource, identifier, env) {
   const started = Date.now();
   const r = await clientFor(e).put(path, resource);
   logger.response(r.status, r.statusText, describeResult(r), Date.now() - started, e);
+  logDiagnostics(r, e, identifier);
   return r;
 }
 

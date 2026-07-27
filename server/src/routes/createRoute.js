@@ -28,9 +28,11 @@ function validationOutcome(err) {
   };
 }
 
-// POST 與 PUT 共用的組裝 + 呼叫 FHIR Server + 回應整理邏輯，
-// 差異只在 callFhir（POST 建立 vs. PUT Upsert）與是否附加 outcome 欄位
-async function submitResource(req, res, resourceType, builder, callFhir, extraFields) {
+// POST 與 PUT 共用的組裝 + 呼叫 FHIR Server + 回應整理邏輯：
+// - extraFields：成功時附加的額外欄位（PUT 用來附 outcome: created/updated）
+// - errorOverride：非 2xx 時可覆寫 status/outcome（PUT 用來把 412 多筆匹配
+//   轉譯為更明確的 409 重複資料錯誤，見 docs/v4-design.md 第 3 節設計 C）
+async function submitResource(req, res, resourceType, builder, callFhir, extraFields, errorOverride) {
   const env = fhirClient.resolveEnv(req.get('X-FHIR-Env'));
   const ig = resolveIG(req.get('X-FHIR-IG'));
   try {
@@ -47,13 +49,14 @@ async function submitResource(req, res, resourceType, builder, callFhir, extraFi
         ...(extraFields ? extraFields(r) : {})
       });
     } else {
-      // 4xx/5xx：帶回 OperationOutcome 供前端顯示錯誤訊息
-      res.status(r.status).json({
+      // 4xx/5xx：帶回 OperationOutcome 供前端顯示錯誤訊息（除非被 errorOverride 覆寫）
+      const override = errorOverride ? errorOverride(r) : null;
+      res.status(override ? override.status : r.status).json({
         resourceType,
-        status: r.status,
+        status: override ? override.status : r.status,
         env,
         ig,
-        outcome: r.data
+        outcome: override ? override.outcome : r.data
       });
     }
   } catch (err) {
@@ -116,7 +119,25 @@ function createRoute(resourceType, builder) {
         resourceType,
         builder,
         (resource, env) => fhirClient.upsert(resourceType, resource, resource.identifier[0], env),
-        (r) => ({ outcome: r.status === 201 ? 'created' : 'updated' })
+        (r) => ({ outcome: r.status === 201 ? 'created' : 'updated' }),
+        (r) =>
+          r.status === 412
+            ? {
+                status: 409,
+                outcome: {
+                  resourceType: 'OperationOutcome',
+                  issue: [
+                    {
+                      severity: 'error',
+                      code: 'duplicate',
+                      details: {
+                        text: `externalId=${externalId} 對應多筆既有資源，可能為外部資料重複，需人工複核`
+                      }
+                    }
+                  ]
+                }
+              }
+            : null
       )
     );
   });
