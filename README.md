@@ -155,7 +155,7 @@ Express 不落地資料庫，僅作為 proxy / 組裝層，所有資源實際存
 ```bash
 cd server
 npm install
-cp .env.example .env     # FHIR_URL_TWCORE / FHIR_URL_HAPI_ORG / FHIR_ENV / PORT
+cp .env.example .env     # FHIR_URL_TWCORE / FHIR_URL_HAPI_ORG / FHIR_ENV / FHIR_IG / PORT
 npm run dev              # nodemon；log 同步輸出 console 與 logs/exchange.log
 ```
 
